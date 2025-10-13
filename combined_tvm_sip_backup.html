@@ -136,6 +136,15 @@
           </div></div>
         </div>
       </div>
+
+      <div class="card card-soft mt-3"><div class="card-body">
+        <h6 class="mb-2">⬇️ Export</h6>
+        <div class="d-flex gap-2">
+          <button id="ps-exportExcelBtn" class="btn btn-outline-secondary btn-sm">Download Excel</button>
+          <button id="ps-exportCsvBtn" class="btn btn-outline-secondary btn-sm">Download CSV</button>
+          <span id="ps-exportStatus" class="ms-2 text-secondary small"></span>
+        </div>
+      </div></div>
     </div>
 
     <!-- SIP/Ladder -->
@@ -574,6 +583,48 @@ function psHandleNB(){
   psLastContext = psBuildContext();
 }
 
+function psGatherSnapshot(){
+  return {
+    tvm: pyodide.globals.get('last_tvm')?.toJs?.({dict_hook:Object}) || null,
+    property: pyodide.globals.get('last_prop')?.toJs?.({dict_hook:Object}) || null,
+    cashflow: pyodide.globals.get('last_cf')?.toJs?.({dict_hook:Object}) || null,
+    netbalance: pyodide.globals.get('last_nb')?.toJs?.({dict_hook:Object}) || null,
+    context: psLastContext,
+    ts: new Date().toISOString()
+  };
+}
+function psExportExcel(){
+  try{
+    const snap = psGatherSnapshot();
+    const wb = XLSX.utils.book_new();
+    const summary = [['Timestamp', snap.ts], ['Context', snap.context || '']];
+    if(snap.property){ summary.push(['Property NOI (annual)', snap.property.noi_now||0], ['Property Cap Value (today)', snap.property.cap_value_today||0], ['Property DCF', snap.property.dcf_value||0]); }
+    if(snap.cashflow){ summary.push(['Cashflow Inflow / month', snap.cashflow.inflow||0], ['Cashflow Outflow / month', snap.cashflow.outflow||0], ['Cashflow Net / month', snap.cashflow.net||0]); }
+    if(snap.netbalance){ summary.push(['Assets', snap.netbalance.assets||0], ['Liabilities', snap.netbalance.liabs||0], ['Net Worth', snap.netbalance.net||0]); }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
+    if(snap.property && snap.property.value_path){ XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Year','Value']].concat(snap.property.value_path.map((v,i)=>[i,v]))), 'Property Value Path'); }
+    if(snap.tvm) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([snap.tvm]), 'TVM Result');
+    if(snap.property) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([snap.property]), 'Property Result');
+    if(snap.cashflow) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([snap.cashflow]), 'CashFlow Result');
+    if(snap.netbalance) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([snap.netbalance]), 'NetBalance Result');
+    XLSX.writeFile(wb, 'personal_finance_snapshot.xlsx');
+    document.getElementById('ps-exportStatus').textContent='Excel saved.';
+  }catch(e){ document.getElementById('ps-exportStatus').textContent='Export failed'; console.error(e); }
+}
+function psExportCSV(){
+  try{
+    const snap = psGatherSnapshot();
+    const rows=[]; rows.push(['Timestamp', snap.ts]); rows.push(['Context', `"${(snap.context||'').replace(/"/g,'""')}"`]); rows.push([]);
+    if(snap.property){ rows.push(['Property NOI (annual)', snap.property.noi_now||0], ['Property Cap Value (today)', snap.property.cap_value_today||0], ['Property DCF', snap.property.dcf_value||0]); }
+    if(snap.cashflow){ rows.push(['Cashflow Inflow / month', snap.cashflow.inflow||0], ['Cashflow Outflow / month', snap.cashflow.outflow||0], ['Cashflow Net / month', snap.cashflow.net||0]); }
+    if(snap.netbalance){ rows.push(['Assets', snap.netbalance.assets||0], ['Liabilities', snap.netbalance.liabs||0], ['Net Worth', snap.netbalance.net||0]); }
+    if(snap.property && snap.property.value_path){ rows.push([]); rows.push(['Property Value Path']); rows.push(['Year','Value']); snap.property.value_path.forEach((v,i)=> rows.push([i,v])); }
+    const csv = rows.map(r=>r.join(',')).join('\r\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='personal_finance_snapshot.csv'; a.click();
+    document.getElementById('ps-exportStatus').textContent='CSV saved.';
+  }catch(e){ document.getElementById('ps-exportStatus').textContent='Export failed'; console.error(e); }
+}
+
 /* SIP/RD Planner UI */
 function lpReadInputs(){
   const now = new Date();
@@ -712,6 +763,8 @@ window.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById('ps-propCalc').addEventListener('click', psHandleProperty);
   document.getElementById('ps-cfCalc').addEventListener('click', psHandleCF);
   document.getElementById('ps-nbCalc').addEventListener('click', psHandleNB);
+  document.getElementById('ps-exportExcelBtn').addEventListener('click', psExportExcel);
+  document.getElementById('ps-exportCsvBtn').addEventListener('click', psExportCSV);
 
   document.getElementById('lp-runBtn').addEventListener('click', lpRun);
   document.getElementById('lp-exportXlsx').addEventListener('click', lpExportExcel);
