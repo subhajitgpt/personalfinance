@@ -63,9 +63,21 @@
         <div class="row g-2">
           <div class="col-6"><label class="form-label mb-1">Purchase Price</label><input id="propPrice" type="number" step="0.01" class="form-control" value="6500000"></div>
           <div class="col-6"><label class="form-label mb-1">Annual Appreciation %</label><input id="propApp" type="number" step="0.01" class="form-control" value="6"></div>
+
+          <!-- Keep Years / Rent / Occ aligned in one row -->
           <div class="col-4"><label class="form-label mb-1">Years</label><input id="propYears" type="number" step="1" class="form-control" value="10"></div>
-          <div class="col-4"><label class="form-label mb-1">Monthly Rent</label><input id="propRent" type="number" step="0.01" class="form-control" value="25000"></div>
+
+          <div class="col-4">
+            <label class="form-label mb-1">Monthly Rent</label>
+            <div class="input-group">
+              <span class="input-group-text">₹</span>
+              <input id="propRent" type="number" step="0.01" class="form-control" placeholder="leave blank for no rent">
+            </div>
+            <div class="form-text small text-muted">Leave blank to value using market cap (no rent)</div>
+          </div>
+
           <div class="col-4"><label class="form-label mb-1">Occ. %</label><input id="propOcc" type="number" step="0.1" class="form-control" value="95"></div>
+
           <div class="col-6"><label class="form-label mb-1">Expense Ratio % (of rent)</label><input id="propExp" type="number" step="0.1" class="form-control" value="25"></div>
           <div class="col-6"><label class="form-label mb-1">Cap Rate %</label><input id="propCap" type="number" step="0.1" class="form-control" value="6.5"></div>
         </div>
@@ -156,13 +168,19 @@
   <!-- EXPORT -->
   <div class="card card-soft mt-3"><div class="card-body">
     <h6 class="mb-2">⬇️ Export</h6>
-    <button id="exportBtn" class="btn btn-outline-secondary btn-sm">Download snapshot JSON</button>
-    <span id="exportStatus" class="ms-2 text-secondary small"></span>
+    <div class="d-flex gap-2">
+      <button id="exportExcelBtn" class="btn btn-outline-secondary btn-sm">Download Excel</button>
+      <button id="exportCsvBtn" class="btn btn-outline-secondary btn-sm">Download CSV</button>
+      <span id="exportStatus" class="ms-2 text-secondary small"></span>
+    </div>
   </div></div>
 </div>
 
 <!-- Pyodide -->
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.0/full/pyodide.js" crossorigin="anonymous"></script>
+<!-- SheetJS for Excel export -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
 <script>
 let pyodide=null, isReady=false;
 let lastContext="";
@@ -183,7 +201,6 @@ import matplotlib.pyplot as plt
 from matplotlib import use
 use('Agg')
 
-# -------------- Helpers --------------
 def plot_to_base64(fig):
     buf = io.BytesIO(); fig.savefig(buf, format='png', bbox_inches='tight', dpi=144); buf.seek(0)
     b64 = base64.b64encode(buf.read()).decode('utf-8'); plt.close(fig); return b64
@@ -191,10 +208,6 @@ def plot_to_base64(fig):
 def safe_float(x):
     try: return float(x)
     except: return 0.0
-
-# -------------- TVM --------------
-# Convention: rate per period, PMT at end of period (ordinary annuity)
-# Solve for one of PV, FV, PMT, N given others
 
 def tvm(rate, n, pv, pmt, fv, solve='pv'):
     r = rate
@@ -211,7 +224,6 @@ def tvm(rate, n, pv, pmt, fv, solve='pv'):
         else: val = (fv - pv*(1+r)**n) * r / (((1+r)**n) - 1)
         return {'pmt': val}
     if solve=='n':
-        # Solve n from: fv = pv*(1+r)^n + pmt*(( (1+r)^n -1)/r)
         if r==0:
             val = (fv - pv)/pmt if pmt!=0 else float('nan')
         else:
@@ -222,13 +234,11 @@ def tvm(rate, n, pv, pmt, fv, solve='pv'):
         return {'n': val}
     return {}
 
-# -------------- Property Valuation --------------
-# Simple annual appreciation path + Cap-rate valuation + DCF of rents
-
 def property_valuation(price, app_rate, years, monthly_rent, occ_pct, exp_ratio, cap_rate, disc_rate=None):
+    # Monthly_rent may be None; handle rent==0 or None by imputing NOI from market cap
     app = app_rate
     n = int(years)
-    rent = monthly_rent
+    rent = 0.0 if monthly_rent is None else monthly_rent
     occ = occ_pct/100.0
     exp = exp_ratio/100.0
     cap = cap_rate/100.0
@@ -237,25 +247,28 @@ def property_valuation(price, app_rate, years, monthly_rent, occ_pct, exp_ratio,
     # Appreciation curve
     values = [price * ((1+app)**t) for t in range(n+1)]
 
-    # NOI today (annual)
-    eff_rent = rent*12*occ
-    noi_now = eff_rent*(1-exp)
+    # If rent > 0, compute NOI from rent; if rent == 0 treat as owner-occupied and impute NOI from price*cap
+    if rent > 0:
+        eff_rent = rent*12*occ
+        noi_now = eff_rent*(1-exp)
+        # DCF of rents
+        cf = []
+        for t in range(1, n+1):
+            gross = rent*12*(1+app)**(t-1)*occ
+            noi = gross*(1-exp)
+            cf.append(noi)
+        term = cf[-1]/cap if (cap>0 and len(cf)>0) else 0
+        dcf = sum( cf[t-1] / ((1+disc)**t) for t in range(1, n+1) ) + term/((1+disc)**n)
+        cap_val = noi_now/cap if cap>0 else float('nan')
+    else:
+        # Impute NOI from market cap using price and cap rate (so cap_val will equal price)
+        noi_now = price * cap
+        cap_val = price
+        # project imputed NOI growing with appreciation and discount
+        cf = [noi_now * ((1+app)**(t-1)) for t in range(1, n+1)]
+        term = cf[-1]/cap if (cap>0 and len(cf)>0) else 0
+        dcf = sum( cf[t-1] / ((1+disc)**t) for t in range(1, n+1) ) + term/((1+disc)**n) if len(cf)>0 else 0.0
 
-    # Cap value today (no growth adj)
-    cap_val = noi_now/cap if cap>0 else float('nan')
-
-    # DCF of cash flows (rents growing with appreciation as proxy)
-    cf = []
-    for t in range(1, n+1):
-        gross = rent*12*(1+app)**(t-1)*occ
-        noi = gross*(1-exp)
-        cf.append(noi)
-    # Terminal value using cap on year-n NOI
-    term = cf[-1]/cap if cap>0 else 0
-    # Discount
-    dcf = sum( cf[t-1] / ((1+disc)**t) for t in range(1, n+1) ) + term/((1+disc)**n)
-
-    # Build chart
     fig, ax = plt.subplots(figsize=(8,5))
     ax.plot(range(n+1), values, marker='o')
     ax.set_title('Projected Property Value'); ax.set_xlabel('Year'); ax.set_ylabel('Value')
@@ -270,13 +283,10 @@ def property_valuation(price, app_rate, years, monthly_rent, occ_pct, exp_ratio,
         'chart': chart
     }
 
-# -------------- Cash Flow --------------
-
 def monthly_cash_flow(income, biz, fixed, variable, emi, invest):
     inflow = safe_float(income) + safe_float(biz)
     outflow = safe_float(fixed) + safe_float(variable) + safe_float(emi) + safe_float(invest)
     net = inflow - outflow
-    # chart bars
     fig, ax = plt.subplots(figsize=(7,4))
     cats = ['Inflow','Fixed','Variable','EMI','Invest','Net']
     vals = [inflow, fixed, variable, emi, invest, net]
@@ -284,8 +294,6 @@ def monthly_cash_flow(income, biz, fixed, variable, emi, invest):
     ax.set_title('Monthly Cash Flow'); ax.grid(axis='y', alpha=.3)
     chart = plot_to_base64(fig)
     return {'inflow':inflow,'outflow':outflow,'net':net,'chart':chart}
-
-# -------------- Net Balance --------------
 
 def net_balance(liquid, invest, other, st_liab, lt_liab):
     assets = safe_float(liquid) + safe_float(invest) + safe_float(other)
@@ -298,8 +306,6 @@ def net_balance(liquid, invest, other, st_liab, lt_liab):
     ax.set_title('Net Worth Snapshot'); ax.grid(axis='y', alpha=.3)
     chart = plot_to_base64(fig)
     return {'assets':assets,'liabs':liabs,'net':net,'chart':chart}
-
-# -------------- Context Builder --------------
 
 def build_context(tvm_json, prop_json, cf_json, nb_json):
     parts=[]
@@ -324,6 +330,44 @@ print('✅ Python setup complete!')
 function fmtINR(x){ try{ return Number(x).toLocaleString('en-IN',{maximumFractionDigits:0}); }catch(_){ return x; } }
 function setSignal(el, val){ const n=Number(val||0); el.textContent = n>=0? (n>0? 'OK' : 'Neutral') : 'Warning'; el.className='pill ' + (n>0? 'pill-ok' : n===0? 'pill-warn' : 'pill-bad'); }
 
+// ---------- Utility: read raw inputs ----------
+function getRawInputs(){
+  return {
+    tvm: {
+      solve: document.getElementById('tvmSolve').value,
+      rate_pct: document.getElementById('tvmRate').value,
+      n: document.getElementById('tvmN').value,
+      pv: document.getElementById('tvmPV').value,
+      pmt: document.getElementById('tvmPMT').value,
+      fv: document.getElementById('tvmFV').value
+    },
+    property: {
+      price: document.getElementById('propPrice').value,
+      app_pct: document.getElementById('propApp').value,
+      years: document.getElementById('propYears').value,
+      monthly_rent: document.getElementById('propRent').value,
+      occ_pct: document.getElementById('propOcc').value,
+      exp_pct: document.getElementById('propExp').value,
+      cap_pct: document.getElementById('propCap').value
+    },
+    cashflow: {
+      income: document.getElementById('cfIncome').value,
+      biz: document.getElementById('cfBiz').value,
+      fixed: document.getElementById('cfFix').value,
+      variable: document.getElementById('cfVar').value,
+      emi: document.getElementById('cfEmi').value,
+      invest: document.getElementById('cfInv').value
+    },
+    netbalance: {
+      liquid: document.getElementById('nbLiquid').value,
+      invest: document.getElementById('nbInvest').value,
+      other: document.getElementById('nbOther').value,
+      st_liab: document.getElementById('nbStLiab').value,
+      lt_liab: document.getElementById('nbLtLiab').value
+    }
+  };
+}
+
 // ---------- TVM UI ----------
 async function handleTVM(){
   const solve = document.getElementById('tvmSolve').value;
@@ -334,6 +378,7 @@ async function handleTVM(){
   const fv = Number(document.getElementById('tvmFV').value);
   const py = `tvm(${r}, ${n}, ${pv}, ${pmt}, ${fv}, solve='${solve}')`;
   const res = pyodide.runPython(py).toJs({dict_hook:Object});
+  setLast('last_tvm', res);
   const key = Object.keys(res)[0]; const val = res[key];
   document.getElementById('tvmOut').textContent = `${key.toUpperCase()}: ₹${fmtINR(val)}`;
   lastContext = buildContext();
@@ -344,15 +389,18 @@ async function handleProperty(){
   const price = Number(document.getElementById('propPrice').value);
   const app = Number(document.getElementById('propApp').value)/100.0;
   const yrs = Number(document.getElementById('propYears').value);
-  const rent= Number(document.getElementById('propRent').value);
+  const rentRaw = document.getElementById('propRent').value;
+  // pass None to python when blank; pass numeric when provided (including 0)
+  const rentArg = (rentRaw === '' || rentRaw === null) ? 'None' : Number(rentRaw);
   const occ = Number(document.getElementById('propOcc').value);
   const exp = Number(document.getElementById('propExp').value);
   const cap = Number(document.getElementById('propCap').value);
-  const py = `property_valuation(${price}, ${app}, ${yrs}, ${rent}, ${occ}, ${exp}, ${cap})`;
+  const py = `property_valuation(${price}, ${app}, ${yrs}, ${rentArg}, ${occ}, ${exp}, ${cap})`;
   const res = pyodide.runPython(py).toJs({dict_hook:Object});
+  setLast('last_prop', res);
   document.getElementById('propOut').textContent = `NOI ₹${fmtINR(res.noi_now)} | CapVal ₹${fmtINR(res.cap_value_today)} | DCF ₹${fmtINR(res.dcf_value)}`;
   document.getElementById('propChart').src = 'data:image/png;base64,'+res.chart;
-  const sig = res.cap_value_today - price; setSignal(document.getElementById('propSignal'), sig);
+  const sig = (res.cap_value_today||0) - price; setSignal(document.getElementById('propSignal'), sig);
   lastContext = buildContext();
 }
 
@@ -368,6 +416,7 @@ async function handleCF(){
   };
   const py = `monthly_cash_flow(${cf.income}, ${cf.biz}, ${cf.fixed}, ${cf.variable}, ${cf.emi}, ${cf.invest})`;
   const res = pyodide.runPython(py).toJs({dict_hook:Object});
+  setLast('last_cf', res);
   document.getElementById('cfOut').textContent = `Net / month: ₹${fmtINR(res.net)} (Inflow ₹${fmtINR(res.inflow)}, Outflow ₹${fmtINR(res.outflow)})`;
   document.getElementById('cfChart').src = 'data:image/png;base64,'+res.chart;
   setSignal(document.getElementById('cfSignal'), res.net);
@@ -385,6 +434,7 @@ async function handleNB(){
   };
   const py = `net_balance(${nb.liquid}, ${nb.invest}, ${nb.other}, ${nb.st}, ${nb.lt})`;
   const res = pyodide.runPython(py).toJs({dict_hook:Object});
+  setLast('last_nb', res);
   document.getElementById('nbOut').textContent = `Assets ₹${fmtINR(res.assets)} | Liabs ₹${fmtINR(res.liabs)} | Net ₹${fmtINR(res.net)}`;
   document.getElementById('nbChart').src = 'data:image/png;base64,'+res.chart;
   setSignal(document.getElementById('nbSignal'), res.net);
@@ -405,41 +455,139 @@ async function callOpenAI({apiKey, model, system, user}){
 }
 
 function buildContext(){
-  const ctx = pyodide.runPython(`build_context(globals().get('last_tvm'), globals().get('last_prop'), globals().get('last_cf'), globals().get('last_nb'))`);
-  return ctx;
+  try{
+    const ctx = pyodide.runPython(`build_context(globals().get('last_tvm'), globals().get('last_prop'), globals().get('last_cf'), globals().get('last_nb'))`);
+    return ctx.toString();
+  }catch(e){ return ''; }
 }
 
 // Keep last results in Python globals for context
-function setLast(name, obj){ pyodide.globals.set(name, obj); }
+function setLast(name, obj){ try{ pyodide.globals.set(name, obj); }catch(e){ console.error(e); } }
+
+// ---------- Exports (Excel / CSV) ----------
+function gatherSnapshot(){
+  return {
+    raw_inputs: getRawInputs(),
+    tvm: pyodide.globals.get('last_tvm')?.toJs?.({dict_hook:Object}) || null,
+    property: pyodide.globals.get('last_prop')?.toJs?.({dict_hook:Object}) || null,
+    cashflow: pyodide.globals.get('last_cf')?.toJs?.({dict_hook:Object}) || null,
+    netbalance: pyodide.globals.get('last_nb')?.toJs?.({dict_hook:Object}) || null,
+    context: lastContext,
+    ts: new Date().toISOString()
+  };
+}
+
+function exportToExcel(){
+  try{
+    const snap = gatherSnapshot();
+    const wb = XLSX.utils.book_new();
+
+    // Raw inputs sheet
+    const raw = [];
+    raw.push(['Section','Key','Value']);
+    Object.entries(snap.raw_inputs).forEach(([section, obj])=>{
+      Object.entries(obj).forEach(([k,v])=> raw.push([section, k, v]));
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(raw), 'Raw Inputs');
+
+    // Summary sheet
+    const summary = [
+      ['Timestamp', snap.ts],
+      ['Context', snap.context || ''],
+    ];
+    if(snap.property){
+      summary.push(['Property NOI (annual)', snap.property.noi_now || 0]);
+      summary.push(['Property Cap Value (today)', snap.property.cap_value_today || 0]);
+      summary.push(['Property DCF', snap.property.dcf_value || 0]);
+    }
+    if(snap.cashflow){
+      summary.push(['Cashflow Inflow / month', snap.cashflow.inflow || 0]);
+      summary.push(['Cashflow Outflow / month', snap.cashflow.outflow || 0]);
+      summary.push(['Cashflow Net / month', snap.cashflow.net || 0]);
+    }
+    if(snap.netbalance){
+      summary.push(['Assets', snap.netbalance.assets || 0]);
+      summary.push(['Liabilities', snap.netbalance.liabs || 0]);
+      summary.push(['Net Worth', snap.netbalance.net || 0]);
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
+
+    // Property value path detailed sheet
+    if(snap.property && snap.property.value_path){
+      const rows = [['Year','Value']].concat(snap.property.value_path.map((v,i)=>[i, v]));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Property Value Path');
+    }
+
+    // Add flat JSON sheets for raw data + results
+    if(snap.tvm) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([snap.tvm]), 'TVM Result');
+    if(snap.property) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([snap.property]), 'Property Result');
+    if(snap.cashflow) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([snap.cashflow]), 'CashFlow Result');
+    if(snap.netbalance) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([snap.netbalance]), 'NetBalance Result');
+
+    XLSX.writeFile(wb, 'personal_finance_snapshot.xlsx');
+    document.getElementById('exportStatus').textContent = 'Excel saved.';
+  }catch(e){
+    document.getElementById('exportStatus').textContent = 'Export failed';
+    console.error(e);
+  }
+}
+
+function exportToCSV(){
+  try{
+    const snap = gatherSnapshot();
+    const rows = [];
+
+    rows.push(['Timestamp', snap.ts]);
+    rows.push(['Context', `"${(snap.context||'').replace(/"/g,'""')}"`]);
+    rows.push([]);
+    rows.push(['Raw Inputs']);
+    rows.push(['Section','Key','Value']);
+    Object.entries(snap.raw_inputs).forEach(([section,obj])=>{
+      Object.entries(obj).forEach(([k,v])=>{
+        rows.push([section,k,`"${String(v).replace(/"/g,'""')}"`]);
+      });
+    });
+
+    rows.push([]);
+    rows.push(['Summary']);
+    if(snap.property){
+      rows.push(['Property NOI (annual)', snap.property.noi_now || 0]);
+      rows.push(['Property Cap Value (today)', snap.property.cap_value_today || 0]);
+      rows.push(['Property DCF', snap.property.dcf_value || 0]);
+    }
+    if(snap.cashflow){
+      rows.push(['Cashflow Inflow / month', snap.cashflow.inflow || 0]);
+      rows.push(['Cashflow Outflow / month', snap.cashflow.outflow || 0]);
+      rows.push(['Cashflow Net / month', snap.cashflow.net || 0]);
+    }
+    if(snap.netbalance){
+      rows.push(['Assets', snap.netbalance.assets || 0]);
+      rows.push(['Liabilities', snap.netbalance.liabs || 0]);
+      rows.push(['Net Worth', snap.netbalance.net || 0]);
+    }
+
+    if(snap.property && snap.property.value_path){
+      rows.push([]);
+      rows.push(['Property Value Path']);
+      rows.push(['Year','Value']);
+      snap.property.value_path.forEach((v,i)=> rows.push([i, v]));
+    }
+
+    const csv = rows.map(r => r.join(',')).join('\r\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'personal_finance_snapshot.csv'; a.click();
+    document.getElementById('exportStatus').textContent = 'CSV saved.';
+  }catch(e){
+    document.getElementById('exportStatus').textContent = 'Export failed';
+    console.error(e);
+  }
+}
 
 // Wire buttons
 window.addEventListener('DOMContentLoaded', ()=>{
   initPyodide();
-  document.getElementById('tvmCalc').addEventListener('click', ()=>{
-    // run and store last
-    const solve = document.getElementById('tvmSolve').value;
-    const r = Number(document.getElementById('tvmRate').value)/100.0;
-    const n = Number(document.getElementById('tvmN').value);
-    const pv= Number(document.getElementById('tvmPV').value);
-    const pmt=Number(document.getElementById('tvmPMT').value);
-    const fv = Number(document.getElementById('tvmFV').value);
-    const res = pyodide.runPython(`tvm(${r}, ${n}, ${pv}, ${pmt}, ${fv}, solve='${solve}')`).toJs({dict_hook:Object});
-    setLast('last_tvm', res); const k=Object.keys(res)[0]; document.getElementById('tvmOut').textContent = `${k.toUpperCase()}: ₹${fmtINR(res[k])}`; lastContext = buildContext();
-  });
-  document.getElementById('propCalc').addEventListener('click', ()=>{
-    const price = Number(document.getElementById('propPrice').value);
-    const app = Number(document.getElementById('propApp').value)/100.0;
-    const yrs = Number(document.getElementById('propYears').value);
-    const rent= Number(document.getElementById('propRent').value);
-    const occ = Number(document.getElementById('propOcc').value);
-    const exp = Number(document.getElementById('propExp').value);
-    const cap = Number(document.getElementById('propCap').value);
-    const res = pyodide.runPython(`property_valuation(${price}, ${app}, ${yrs}, ${rent}, ${occ}, ${exp}, ${cap})`).toJs({dict_hook:Object});
-    setLast('last_prop', res);
-    document.getElementById('propOut').textContent = `NOI ₹${fmtINR(res.noi_now)} | CapVal ₹${fmtINR(res.cap_value_today)} | DCF ₹${fmtINR(res.dcf_value)}`;
-    document.getElementById('propChart').src = 'data:image/png;base64,'+res.chart;
-    const sig = res.cap_value_today - price; setSignal(document.getElementById('propSignal'), sig); lastContext = buildContext();
-  });
+  document.getElementById('tvmCalc').addEventListener('click', ()=>{ handleTVM(); });
+  document.getElementById('propCalc').addEventListener('click', ()=>{ handleProperty(); });
   document.getElementById('cfCalc').addEventListener('click', ()=>{ handleCF(); });
   document.getElementById('nbCalc').addEventListener('click', ()=>{ handleNB(); });
 
@@ -457,33 +605,13 @@ window.addEventListener('DOMContentLoaded', ()=>{
       document.getElementById('answerHr').classList.remove('d-none');
       document.getElementById('answerDiv').classList.remove('d-none');
       document.getElementById('answer').textContent = reply;
-    }catch(e){ document.getElementById('askStatus').textContent = 'Error: '+e.message; }
+    }catch(e){ document.getElementById('askStatus').textContent = 'Error: '+(e?.message||e); }
   });
 
-  document.getElementById('exportBtn').addEventListener('click', ()=>{
-    const snapshot = {
-      tvm: pyodide.globals.get('last_tvm')?.toJs?.({dict_hook:Object}) || null,
-      property: pyodide.globals.get('last_prop')?.toJs?.({dict_hook:Object}) || null,
-      cashflow: pyodide.globals.get('last_cf')?.toJs?.({dict_hook:Object}) || null,
-      netbalance: pyodide.globals.get('last_nb')?.toJs?.({dict_hook:Object}) || null,
-      context: lastContext,
-      ts: new Date().toISOString()
-    };
-    const blob = new Blob([JSON.stringify(snapshot,null,2)], {type:'application/json'});
-    const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='personal_finance_snapshot.json'; a.click();
-    document.getElementById('exportStatus').textContent = 'Saved.';
-  });
+  document.getElementById('exportExcelBtn').addEventListener('click', exportToExcel);
+  document.getElementById('exportCsvBtn').addEventListener('click', exportToCSV);
 });
 </script>
 
-<!-- Optional tiny Flask server (save as app.py) to serve this file locally)
-from flask import Flask, send_from_directory
-app = Flask(__name__)
-@app.route('/')
-def index():
-    return send_from_directory('.', 'index.html')
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8091, debug=True)
--->
 </body>
 </html>
