@@ -1,0 +1,972 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Finance Tools — Personal Studio • SIP/RD Ladder • FD Ladder (Pyodide)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+<style>
+  :root{ --ink:#0f172a; --muted:#677084; --soft:#e7eef5; --brand:#2563eb; --brand2:#7c3aed; }
+  body{background:#f7f9fc;color:var(--ink)}
+  .navbar{background:linear-gradient(90deg,#0ea5e9,#6366f1)}
+  .navbar .navbar-brand,.navbar .navbar-text{color:#fff}
+  .hero{position:relative;z-index:0;background:
+    radial-gradient(1200px 400px at 20% -10%, rgba(124,58,237,.15), transparent),
+    radial-gradient(1200px 400px at 80% -10%, rgba(37,99,235,.15), transparent);
+    border-bottom:1px solid var(--soft)}
+  .hero h3{margin:0;padding:18px 0}
+  .container-page{padding:24px}
+  .card-soft{border:1px solid var(--soft);box-shadow:0 8px 24px rgba(16,24,40,.06);background:#fff;border-radius:14px}
+  .section-title{font-weight:700}
+  .img-box{border:1px solid var(--soft);border-radius:12px;padding:6px;background:#fff;box-shadow:0 2px 6px rgba(16,24,40,.04)}
+  .viz-img{width:100%;height:100%;object-fit:contain}
+  .pill{padding:.25rem .6rem;border-radius:999px;font-weight:600}
+  .pill-ok{background:#e9f9ef;color:#0f8f3d}
+  .pill-warn{background:#fff6e5;color:#b96a00}
+  .pill-bad{background:#ffe9e9;color:#cc2e2e}
+  .btn-primary{background:linear-gradient(90deg,var(--brand),var(--brand2));border:0}
+  .btn-outline{border:1px solid var(--soft)}
+  .small-muted{font-size:.9rem;color:var(--muted)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap}
+  .spinner{display:inline-block;width:1rem;height:1rem;border:2px solid #cbd5e1;border-top-color:#2563eb;border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .tabs-wrapper{position:sticky;top:10px;z-index:5}
+  .nav-tabs{background:#fff;border-radius:12px;padding:6px;border:1px solid var(--soft)}
+  .nav-tabs .nav-link{color:var(--ink);font-weight:600;border:0;border-radius:10px;padding:.5rem .9rem;opacity:.9}
+  .nav-tabs .nav-link:hover{opacity:1;background:#f1f5ff}
+  .nav-tabs .nav-link.active{background:#fff;box-shadow:0 6px 16px rgba(16,24,40,.08);outline:2px solid #e5ebff;opacity:1}
+
+  .ai-panel{
+    position:fixed; right:18px; top:110px; width:360px; max-height:calc(100vh - 140px);
+    background:#fff; border:1px solid var(--soft); border-radius:16px; box-shadow:0 16px 40px rgba(16,24,40,.14);
+    display:flex; flex-direction:column; overflow:hidden; z-index:20;
+  }
+  .ai-panel .ai-head{padding:10px 12px;border-bottom:1px solid var(--soft);display:flex;align-items:center;gap:8px}
+  .ai-dot{width:8px;height:8px;border-radius:999px;background:#22c55e}
+  .ai-title{font-weight:700}
+  .ai-body{padding:12px;overflow:auto}
+  .ai-foot{padding:10px 12px;border-top:1px solid var(--soft);display:flex;gap:8px}
+  .ai-mini{position:fixed;right:18px;top:110px;background:#fff;border:1px solid var(--soft);border-radius:999px;padding:8px 10px;box-shadow:0 12px 28px rgba(16,24,40,.12);z-index:20;display:none}
+  .ai-hide{display:none}
+  @media (max-width:1200px){ .ai-panel{width:320px} }
+  @media (max-width:992px){
+    .ai-panel{position:fixed;left:12px;right:12px;width:auto;top:auto;bottom:12px;max-height:72vh}
+  }
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <div class="container d-flex justify-content-between">
+    <a class="navbar-brand fw-bold" href="#">Finance Tools</a>
+    <span class="navbar-text">Built with <span class="badge bg-light text-dark">Pyodide</span> + <span class="badge bg-light text-dark">OpenAI</span></span>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="container">
+    <h3>Personal Studio • SIP/RD Ladder • FD Ladder</h3>
+  </div>
+</div>
+
+<div class="container container-page">
+  <div class="tabs-wrapper">
+    <ul class="nav nav-tabs" id="toolTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tab-ps" data-bs-toggle="tab" data-bs-target="#pane-ps" type="button" role="tab" aria-controls="pane-ps" aria-selected="true">💰 Personal Finance Studio</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-lp" data-bs-toggle="tab" data-bs-target="#pane-lp" type="button" role="tab" aria-controls="pane-lp" aria-selected="false">📈 SIP / Lumpsum / RD Ladder</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-fd" data-bs-toggle="tab" data-bs-target="#pane-fd" type="button" role="tab" aria-controls="pane-fd" aria-selected="false">💵 FD Ladder (3/6/9/12-mo)</button>
+      </li>
+    </ul>
+  </div>
+
+  <div class="tab-content mt-3">
+    <!-- ================= PS ================= -->
+    <div class="tab-pane fade show active" id="pane-ps" role="tabpanel" aria-labelledby="tab-ps">
+      <div class="card card-soft mb-3"><div class="card-body">
+        <b>Status:</b> <span id="ps-status" class="text-secondary small">🔄 Initializing…</span>
+      </div></div>
+
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="card card-soft h-100"><div class="card-body">
+            <h5 class="section-title mb-3">⏳ Time Value of Money (TVM)</h5>
+            <div class="row g-2">
+              <div class="col-6"><label class="form-label mb-1">Solve for</label>
+                <select id="ps-tvmSolve" class="form-select"><option value="fv" selected>FV</option><option value="pv">PV</option><option value="pmt">PMT</option><option value="n">N (periods)</option></select></div>
+              <div class="col-6"><label class="form-label mb-1">Rate (%/period)</label><input id="ps-tvmRate" type="number" step="0.0001" class="form-control" value="2.5"></div>
+              <div class="col-4"><label class="form-label mb-1">N (periods)</label><input id="ps-tvmN" type="number" step="1" class="form-control" value="5"></div>
+              <div class="col-4"><label class="form-label mb-1">PV</label><input id="ps-tvmPV" type="number" step="0.01" class="form-control" value="100000"></div>
+              <div class="col-4"><label class="form-label mb-1">PMT (each)</label><input id="ps-tvmPMT" type="number" step="0.01" class="form-control" value="0"></div>
+              <div class="col-12"><label class="form-label mb-1">FV</label><input id="ps-tvmFV" type="number" step="0.01" class="form-control" value="0"></div>
+            </div>
+            <div class="mt-2 d-flex gap-2 align-items-center">
+              <button id="ps-tvmCalc" class="btn btn-primary">Calculate</button>
+              <span id="ps-tvmOut" class="ms-2 fw-bold"></span>
+            </div>
+
+            <div class="img-box mt-2"><img id="ps-tvmChart" class="viz-img" alt="TVM Projection"></div>
+            <div id="ps-tvmFacts" class="small-muted mt-1">—</div>
+          </div></div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="card card-soft h-100"><div class="card-body">
+            <h5 class="section-title mb-3">🏠 Property Valuation</h5>
+            <div class="row g-2">
+              <div class="col-6"><label class="form-label mb-1">Purchase Price</label><input id="ps-propPrice" type="number" step="0.01" class="form-control" value="6500000"></div>
+              <div class="col-6"><label class="form-label mb-1">Annual Appreciation %</label><input id="ps-propApp" type="number" step="0.01" class="form-control" value="6"></div>
+              <div class="col-4"><label class="form-label mb-1">Years</label><input id="ps-propYears" type="number" step="1" class="form-control" value="10"></div>
+              <div class="col-4"><label class="form-label mb-1">Monthly Rent</label><div class="input-group"><span class="input-group-text">₹</span><input id="ps-propRent" type="number" step="0.01" class="form-control" placeholder="leave blank for no rent"></div><div class="form-text small-muted">Leave blank to value with cap only.</div></div>
+              <div class="col-4"><label class="form-label mb-1">Occ. %</label><input id="ps-propOcc" type="number" step="0.1" class="form-control" value="95"></div>
+              <div class="col-6"><label class="form-label mb-1">Expense Ratio % (of rent)</label><input id="ps-propExp" type="number" step="0.1" class="form-control" value="25"></div>
+              <div class="col-6"><label class="form-label mb-1">Cap Rate %</label><input id="ps-propCap" type="number" step="0.1" class="form-control" value="6.5"></div>
+            </div>
+            <div class="mt-2 d-flex gap-2 align-items-center">
+              <button id="ps-propCalc" class="btn btn-primary">Run Valuation</button>
+              <span id="ps-propOut" class="fw-bold"></span>
+              <span id="ps-propSignal" class="pill ms-2">—</span>
+            </div>
+            <div class="img-box mt-2"><img id="ps-propChart" class="viz-img" alt="Projected Property Value"></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="row g-3 mt-1">
+        <div class="col-lg-6">
+          <div class="card card-soft h-100"><div class="card-body">
+            <h5 class="section-title mb-3">💵 Monthly Cash Flow</h5>
+            <div class="row g-2">
+              <div class="col-6"><label class="form-label mb-1">Income (salary + other)</label><input id="ps-cfIncome" type="number" step="0.01" class="form-control" value="200000"></div>
+              <div class="col-6"><label class="form-label mb-1">Business/Side Income</label><input id="ps-cfBiz" type="number" step="0.01" class="form-control" value="40000"></div>
+              <div class="col-6"><label class="form-label mb-1">Fixed Expenses</label><input id="ps-cfFix" type="number" step="0.01" class="form-control" value="80000"></div>
+              <div class="col-6"><label class="form-label mb-1">Variable Expenses</label><input id="ps-cfVar" type="number" step="0.01" class="form-control" value="30000"></div>
+              <div class="col-6"><label class="form-label mb-1">EMI / Loan Outflow</label><input id="ps-cfEmi" type="number" step="0.01" class="form-control" value="45000"></div>
+              <div class="col-6"><label class="form-label mb-1">Investments (SIP/others)</label><input id="ps-cfInv" type="number" step="0.01" class="form-control" value="20000"></div>
+            </div>
+            <div class="mt-2 d-flex gap-2 align-items-center">
+              <button id="ps-cfCalc" class="btn btn-primary">Compute Cash Flow</button>
+              <span id="ps-cfOut" class="fw-bold"></span>
+              <span id="ps-cfSignal" class="pill ms-2">—</span>
+            </div>
+            <div class="img-box mt-2"><img id="ps-cfChart" class="viz-img" alt="Cash Flow Chart"></div>
+          </div></div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="card card-soft h-100"><div class="card-body">
+            <h5 class="section-title mb-3">💼 Net Balance / Liquid Cash</h5>
+            <div class="row g-2">
+              <div class="col-6"><label class="form-label mb-1">Liquid Assets</label><input id="ps-nbLiquid" type="number" step="0.01" class="form-control" value="600000"></div>
+              <div class="col-6"><label class="form-label mb-1">Investments</label><input id="ps-nbInvest" type="number" step="0.01" class="form-control" value="1200000"></div>
+              <div class="col-6"><label class="form-label mb-1">Other Assets</label><input id="ps-nbOther" type="number" step="0.01" class="form-control" value="200000"></div>
+              <div class="col-6"><label class="form-label mb-1">Short-term Liabilities</label><input id="ps-nbStLiab" type="number" step="0.01" class="form-control" value="150000"></div>
+              <div class="col-6"><label class="form-label mb-1">Long-term Liabilities</label><input id="ps-nbLtLiab" type="number" step="0.01" class="form-control" value="1800000"></div>
+            </div>
+            <div class="mt-2 d-flex gap-2 align-items-center">
+              <button id="ps-nbCalc" class="btn btn-primary">Compute Net</button>
+              <span id="ps-nbOut" class="fw-bold"></span>
+              <span id="ps-nbSignal" class="pill ms-2">—</span>
+            </div>
+            <div class="img-box mt-2"><img id="ps-nbChart" class="viz-img" alt="Net Balance Chart"></div>
+          </div></div>
+        </div>
+      </div>
+
+      <!-- ======= Personal Finance Summary ======= -->
+      <div class="card card-soft mt-3">
+        <div class="card-body">
+          <h5 class="section-title mb-2">📑 Personal Finance Summary</h5>
+
+          <div class="table-responsive" style="max-height:340px; overflow:auto">
+            <table class="table table-sm" id="ps-summary-table">
+              <thead class="table-light">
+                <tr>
+                  <th>Section</th><th>Field</th><th>Value</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div class="mt-2 d-flex gap-2">
+            <button id="ps-export-xlsx" class="btn btn-outline btn-sm">Export Excel</button>
+            <button id="ps-export-csv"  class="btn btn-outline btn-sm">Download CSV</button>
+          </div>
+
+          <hr class="my-3"/>
+
+          <div id="ps-health" class="small">
+            <b>Financial health:</b> <span id="ps-health-pill" class="pill">—</span>
+            <div id="ps-health-text" class="mt-2"></div>
+          </div>
+        </div>
+      </div>
+      <!-- ======= /Personal Finance Summary ======= -->
+
+    </div>
+
+    <!-- ================= Ladder ================= -->
+    <div class="tab-pane fade" id="pane-lp" role="tabpanel" aria-labelledby="tab-lp">
+      <div class="card card-soft mb-3"><div class="card-body"><b>Status:</b> <span id="lp-status" class="text-secondary small">🔄 Initializing…</span></div></div>
+
+      <div class="row g-3">
+        <div class="col-xl-7">
+          <div class="card card-soft h-100"><div class="card-body">
+            <h5 class="section-title mb-3">🎯 Goal & Assumptions</h5>
+            <div class="row g-2">
+              <div class="col-md-4"><label class="form-label mb-1">Goal Amount (₹)</label><input id="lp-goalAmt" type="number" step="0.01" class="form-control" value="2000000"></div>
+              <div class="col-md-4"><label class="form-label mb-1">Goal Date (YYYY-MM)</label><input id="lp-goalDate" type="month" class="form-control"></div>
+              <div class="col-md-4"><label class="form-label mb-1">Start Date</label><input id="lp-startDate" type="date" class="form-control"></div>
+              <div class="col-md-4"><label class="form-label mb-1">Current Corpus (₹)</label><input id="lp-currentCorpus" type="number" step="0.01" class="form-control" value="250000"></div>
+              <div class="col-md-4"><label class="form-label mb-1">Corpus Annual Return %</label><input id="lp-corpusRate" type="number" step="0.01" class="form-control" value="6"></div>
+              <div class="col-md-4">
+                <label class="form-label mb-1">Plan Split (SIP % / RD %)</label>
+                <div class="input-group"><input id="lp-splitSip" type="number" class="form-control" value="60" min="0" max="100"><span class="input-group-text">/</span><input id="lp-splitRd" type="number" class="form-control" value="40" min="0" max="100"></div>
+                <div class="small-muted">Should sum to 100.</div>
+              </div>
+              <div class="col-md-4"><label class="form-label mb-1">SIP Expected Annual %</label><input id="lp-sipRate" type="number" step="0.01" class="form-control" value="12"></div>
+              <div class="col-md-4"><label class="form-label mb-1">RD/FD Annual %</label><input id="lp-rdRate" type="number" step="0.01" class="form-control" value="7"></div>
+              <div class="col-md-4"><label class="form-label mb-1">RD Interest</label>
+                <select id="lp-rdMode" class="form-select"><option value="reinvest" selected>Reinvest (RD-style)</option><option value="payout">Monthly payout (no compounding)</option></select>
+              </div>
+            </div>
+            <hr/>
+            <div class="row g-2 align-items-end">
+              <div class="col-md-4"><label class="form-label mb-1">Solve</label>
+                <select id="lp-solveMode" class="form-select"><option value="pmt" selected>Find required monthly contribution</option><option value="fv">Project future value from my monthly amount</option></select>
+              </div>
+              <div class="col-md-4"><label class="form-label mb-1">Monthly Contribution (₹)</label><input id="lp-monthlyAmt" type="number" step="0.01" class="form-control" value="30000"></div>
+              <div class="col-md-4"><button id="lp-runBtn" class="btn btn-primary w-100">Run Planner</button></div>
+            </div>
+          </div></div>
+        </div>
+
+        <div class="col-xl-5">
+          <div class="card card-soft h-100"><div class="card-body">
+            <h5 class="section-title mb-2">📊 Results</h5>
+            <div id="lp-results" class="mono small">—</div>
+            <div class="img-box mt-2"><img id="lp-chart" class="viz-img" alt="Projection Chart"></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="card card-soft mt-3"><div class="card-body">
+        <h6 class="mb-2">📅 Ladder Schedule</h6>
+        <div class="table-responsive" style="max-height:320px; overflow:auto">
+          <table class="table table-sm" id="lp-schedTable">
+            <thead class="table-light"><tr><th>#</th><th>Month</th><th>SIP Contrib</th><th>RD Contrib</th><th>SIP Balance</th><th>RD Balance</th><th>Total Balance</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="mt-2 d-flex gap-2">
+          <button id="lp-exportXlsx" class="btn btn-outline btn-sm">Export Excel</button>
+          <button id="lp-exportCsv" class="btn btn-outline btn-sm">Download CSV</button>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ================= FD ================= -->
+    <div class="tab-pane fade" id="pane-fd" role="tabpanel" aria-labelledby="tab-fd">
+      <div class="card card-soft mb-3"><div class="card-body"><b>Status:</b> <span id="fd-status" class="text-secondary small">🔄 Initializing…</span></div></div>
+
+      <div class="row g-3">
+        <div class="col-xl-7">
+          <div class="card card-soft h-100"><div class="card-body">
+            <h5 class="section-title mb-3">🔁 Auto-Staggered FD Ladder</h5>
+            <div class="row g-2">
+              <div class="col-md-4"><label class="form-label mb-1">Total Principal (₹)</label><input id="fd-total" type="number" class="form-control" value="600000"></div>
+              <div class="col-md-4"><label class="form-label mb-1">Start Date</label><input id="fd-start" type="date" class="form-control"></div>
+              <div class="col-md-4"><label class="form-label mb-1">Horizon (months)</label><input id="fd-horizon" type="number" class="form-control" value="36"></div>
+              <div class="col-md-4"><label class="form-label mb-1">Annual Rate %</label><input id="fd-rate" type="number" step="0.01" class="form-control" value="7"></div>
+              <div class="col-md-4"><label class="form-label mb-1">Terms (months)</label>
+                <select id="fd-terms" class="form-select" multiple>
+                  <option value="3" selected>3</option><option value="6" selected>6</option>
+                  <option value="9" selected>9</option><option value="12" selected>12</option>
+                </select>
+                <div class="form-text small-muted">Ctrl/⌘-click to choose terms</div>
+              </div>
+              <div class="col-md-4"><label class="form-label mb-1">Mode</label>
+                <select id="fd-mode" class="form-select"><option value="reinvest" selected>Reinvest on maturity</option><option value="payout">Monthly interest payout</option></select>
+              </div>
+            </div>
+            <div class="mt-2 d-flex gap-2"><button id="fd-run" class="btn btn-primary">Build Ladder</button></div>
+          </div></div>
+        </div>
+
+        <div class="col-xl-5">
+          <div class="card card-soft h-100"><div class="card-body">
+            <h5 class="section-title mb-2">📊 Ladder Overview</h5>
+            <div id="fd-results" class="mono small">—</div>
+            <div class="img-box mt-2"><img id="fd-chart" class="viz-img" alt="FD Ladder Chart"></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="card card-soft mt-3"><div class="card-body">
+        <h6 class="mb-2">📅 Monthly Simulation</h6>
+        <div class="table-responsive" style="max-height:320px; overflow:auto">
+          <table class="table table-sm" id="fd-table">
+            <thead class="table-light"><tr><th>#</th><th>Month</th><th>Total Book Value</th><th>Interest Payout</th><th>Maturities</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="mt-2 d-flex gap-2">
+          <button id="fd-exportXlsx" class="btn btn-outline btn-sm">Export Excel</button>
+          <button id="fd-exportCsv" class="btn btn-outline btn-sm">Download CSV</button>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Floating Ask-AI Panel -->
+<div id="aiPanel" class="ai-panel">
+  <div class="ai-head">
+    <span class="ai-dot"></span>
+    <div class="ai-title">Chat about this data — <span id="ai-scope">Personal Studio</span></div>
+    <button id="aiCollapse" class="btn btn-sm btn-outline ms-auto">Minimize</button>
+  </div>
+  <div class="ai-body">
+    <div class="small-muted mb-2">Key is stored locally if you tick “Remember”. For production, route via a backend proxy.</div>
+    <div class="mb-2">
+      <label class="form-label">OpenAI API Key</label>
+      <input id="ai-key" class="form-control" type="password" placeholder="sk-...">
+      <div class="form-text"><input type="checkbox" id="ai-remember" class="form-check-input me-1">
+        <label for="ai-remember">Remember key on this device</label></div>
+    </div>
+    
+    <div class="row g-2">
+      <div class="col-7">
+        <label class="form-label">Model</label>
+        <select id="ai-model" class="form-select">
+          <option value="gpt-4o-mini" selected>gpt-4o-mini (fast, cheap)</option>
+          <option value="gpt-4o">gpt-4o</option>
+        </select>
+      </div>
+      <div class="col-5 d-flex align-items-end">
+        <button id="ai-insert" class="btn btn-outline w-100">Insert latest context</button>
+      </div>
+    </div>
+    <textarea id="ai-prompt" class="form-control mt-2" rows="4" placeholder="Ask something about the active tab’s data…"></textarea>
+    <div id="ai-status" class="small text-muted mt-2"></div>
+    <pre id="ai-out" class="mono mt-2 small mb-0">—</pre>
+  </div>
+  <div class="ai-foot">
+    <button id="ai-run" class="btn btn-primary w-100">Ask AI</button>
+  </div>
+</div>
+<button id="aiMini" class="ai-mini">🤖 Ask AI</button>
+
+<footer class="py-3 mt-4 border-top bg-white">
+  <div class="container d-flex justify-content-between small">
+    <div>© 2025 MyLTechs • All rights reserved</div>
+    <div class="text-muted">UI revamp • tabs fix • floating Ask-AI</div>
+  </div>
+</footer>
+
+<!-- libs -->
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.0/full/pyodide.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+/* ================= State ================= */
+let pyodide=null;
+let lpDF=null, lpSummary=null;
+let fdSim=null, fdSummary=null;
+let activeTab='ps'; // 'ps' | 'lp' | 'fd'
+
+/* ================= Helpers ================= */
+const fmtINR=x=>{ try{return Number(x).toLocaleString('en-IN',{maximumFractionDigits:0})}catch(_){return x} }
+const toISODate=d=>d.toISOString().slice(0,10);
+function setSignal(el,val){const n=Number(val||0); el.textContent=n>0?'OK':(n===0?'Neutral':'Warning'); el.className='pill '+(n>0?'pill-ok':n===0?'pill-warn':'pill-bad')}
+
+/* ======= Personal Studio summary state & helpers ======= */
+const psState = {
+  inputs: {
+    tvm: {solve:'fv', rate:2.5, n:5, pv:100000, pmt:0, fv:0},
+    property: {price:6500000, app:6, years:10, rent:null, occ:95, exp:25, cap:6.5},
+    cashflow: {income:200000, biz:40000, fixed:80000, variable:30000, emi:45000, invest:20000},
+    net: {liquid:600000, invest:1200000, other:200000, st:150000, lt:1800000},
+  },
+  outputs: { tvm:null, tvm_path: null, property:null, cashflow:null, net:null }
+};
+
+function addRow(tbody, section, field, value) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${section}</td><td>${field}</td><td>${value}</td>`;
+  tbody.appendChild(tr);
+}
+
+/* ---------- Financial Health (live) ---------- */
+function renderHealth() {
+  const text = document.getElementById('ps-health-text');
+  const pill = document.getElementById('ps-health-pill');
+
+  const cfi = psState.inputs.cashflow, cfo = psState.outputs.cashflow || {};
+  const nbi = psState.inputs.net,      nbo = psState.outputs.net      || {};
+
+  const inflow  = (typeof cfo.inflow === 'number') ? cfo.inflow : (Number(cfi.income||0)+Number(cfi.biz||0));
+  const outflow = (typeof cfo.outflow=== 'number') ? cfo.outflow: (Number(cfi.fixed||0)+Number(cfi.variable||0)+Number(cfi.emi||0)+Number(cfi.invest||0));
+  const netCF   = (typeof cfo.net    === 'number') ? cfo.net    : (inflow - outflow);
+
+  const assets  = (typeof nbo.assets === 'number') ? nbo.assets : (Number(nbi.liquid||0)+Number(nbi.invest||0)+Number(nbi.other||0));
+  const liabs   = (typeof nbo.liabs  === 'number') ? nbo.liabs  : (Number(nbi.st||0)+Number(nbi.lt||0));
+
+  const monthlyExpenses = Number(cfi.fixed||0)+Number(cfi.variable||0)+Number(cfi.emi||0)+Number(cfi.invest||0);
+  const runwayMonths = monthlyExpenses>0 ? Number(nbi.liquid||0)/monthlyExpenses : 0;
+  const savingsRate  = inflow>0 ? Number(cfi.invest||0)/inflow : 0;
+  const debtToAssets = assets>0 ? liabs/assets : 0;
+
+  let score = 0;
+  if (netCF > 0)        score++;
+  if (runwayMonths>=6)  score++;
+  if (savingsRate>=.20) score++;
+  if (debtToAssets<=.5) score++;
+
+  const verdict = score>=3 ? {label:'Healthy', cls:'pill-ok'}
+               : score===2 ? {label:'Watch',   cls:'pill-warn'}
+                            : {label:'Risk',    cls:'pill-bad'};
+
+  pill.textContent = verdict.label;
+  pill.className = `pill ${verdict.cls}`;
+  text.innerHTML = `
+    <ul class="mb-0">
+      <li><b>Net cash flow:</b> ${netCF>0?'Positive':'Negative'} (₹${fmtINR(netCF)})</li>
+      <li><b>Emergency runway:</b> ${runwayMonths.toFixed(1)} months (≥6 months recommended)</li>
+      <li><b>Savings rate:</b> ${(savingsRate*100).toFixed(1)}% (target ≥20%)</li>
+      <li><b>Debt-to-assets:</b> ${(debtToAssets*100).toFixed(1)}% (keep ≤50%)</li>
+    </ul>`;
+}
+
+/* Keep inputs synced (for live health) */
+function psSyncInputsFromDOM(){
+  psState.inputs.cashflow = {
+    income:  Number(document.getElementById('ps-cfIncome').value),
+    biz:     Number(document.getElementById('ps-cfBiz').value),
+    fixed:   Number(document.getElementById('ps-cfFix').value),
+    variable:Number(document.getElementById('ps-cfVar').value),
+    emi:     Number(document.getElementById('ps-cfEmi').value),
+    invest:  Number(document.getElementById('ps-cfInv').value)
+  };
+  psState.inputs.net = {
+    liquid:  Number(document.getElementById('ps-nbLiquid').value),
+    invest:  Number(document.getElementById('ps-nbInvest').value),
+    other:   Number(document.getElementById('ps-nbOther').value),
+    st:      Number(document.getElementById('ps-nbStLiab').value),
+    lt:      Number(document.getElementById('ps-nbLtLiab').value)
+  };
+}
+
+function renderPSSummary() {
+  const tb = document.querySelector('#ps-summary-table tbody');
+  if(!tb) return;
+  tb.innerHTML = '';
+
+  // TVM
+  const tvmi = psState.inputs.tvm, tvmo = psState.outputs.tvm||{};
+  addRow(tb,'TVM (inputs)','Solve for', tvmi.solve.toUpperCase());
+  addRow(tb,'TVM (inputs)','Rate %/period', tvmi.rate);
+  addRow(tb,'TVM (inputs)','N (periods)', tvmi.n);
+  addRow(tb,'TVM (inputs)','PV', `₹${fmtINR(tvmi.pv)}`);
+  addRow(tb,'TVM (inputs)','PMT', `₹${fmtINR(tvmi.pmt)}`);
+  addRow(tb,'TVM (inputs)','FV', `₹${fmtINR(tvmi.fv)}`);
+  Object.entries(tvmo).forEach(([k,v])=> addRow(tb,'TVM (computed)', k.toUpperCase(), `₹${fmtINR(v)}`));
+
+  // Property
+  const pi = psState.inputs.property, po = psState.outputs.property||{};
+  addRow(tb,'Property (inputs)','Purchase Price', `₹${fmtINR(pi.price)}`);
+  addRow(tb,'Property (inputs)','Annual App %', pi.app);
+  addRow(tb,'Property (inputs)','Years', pi.years);
+  addRow(tb,'Property (inputs)','Monthly Rent', pi.rent==null||pi.rent===''?'—':`₹${fmtINR(pi.rent)}`);
+  addRow(tb,'Property (inputs)','Occ % / Exp % / Cap %', `${pi.occ} / ${pi.exp} / ${pi.cap}`);
+  addRow(tb,'Property (computed)','NOI (now)', po?.noi_now!=null?`₹${fmtINR(po.noi_now)}`:'—');
+  addRow(tb,'Property (computed)','Cap Value Today', po?.cap_value_today!=null?`₹${fmtINR(po.cap_value_today)}`:'—');
+  addRow(tb,'Property (computed)','DCF Value', po?.dcf_value!=null?`₹${fmtINR(po.dcf_value)}`:'—');
+
+  // Cash flow
+  const cfi = psState.inputs.cashflow, cfo = psState.outputs.cashflow||{};
+  addRow(tb,'Cash Flow (inputs)','Income + Biz', `₹${fmtINR(cfi.income + cfi.biz)}`);
+  addRow(tb,'Cash Flow (inputs)','Fixed / Variable / EMI / Invest', `₹${fmtINR(cfi.fixed)} / ₹${fmtINR(cfi.variable)} / ₹${fmtINR(cfi.emi)} / ₹${fmtINR(cfi.invest)}`);
+  addRow(tb,'Cash Flow (computed)','Inflow', cfo?.inflow!=null?`₹${fmtINR(cfo.inflow)}`:'—');
+  addRow(tb,'Cash Flow (computed)','Outflow', cfo?.outflow!=null?`₹${fmtINR(cfo.outflow)}`:'—');
+  addRow(tb,'Cash Flow (computed)','Net / month', cfo?.net!=null?`₹${fmtINR(cfo.net)}`:'—');
+
+  // Net worth
+  const nbi = psState.inputs.net, nbo = psState.outputs.net||{};
+  addRow(tb,'Net Worth (inputs)','Assets (liq/invest/other)', `₹${fmtINR(nbi.liquid)} / ₹${fmtINR(nbi.invest)} / ₹${fmtINR(nbi.other)}`);
+  addRow(tb,'Net Worth (inputs)','Liabilities (ST/LT)', `₹${fmtINR(nbi.st)} / ₹${fmtINR(nbi.lt)}`);
+  addRow(tb,'Net Worth (computed)','Assets', nbo?.assets!=null?`₹${fmtINR(nbo.assets)}`:'—');
+  addRow(tb,'Net Worth (computed)','Liabilities', nbo?.liabs!=null?`₹${fmtINR(nbo.liabs)}`:'—');
+  addRow(tb,'Net Worth (computed)','Net Worth', nbo?.net!=null?`₹${fmtINR(nbo.net)}`:'—');
+
+  renderHealth();
+}
+
+/* ======= CSV/Excel export for PS summary ======= */
+function psSummaryRows() {
+  const rows = [['Section','Field','Value']];
+  document.querySelectorAll('#ps-summary-table tbody tr').forEach(tr=>{
+    const tds=[...tr.querySelectorAll('td')].map(td=>td.textContent);
+    rows.push(tds);
+  });
+  return rows;
+}
+function psExportCSV(){
+  const rows = psSummaryRows();
+  const csv = rows.map(r=>r.map(v=>String(v).includes(',')?`"${v}"`:v).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='personal_finance_summary.csv';
+  a.click();
+}
+function psExportXLSX(){
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(psSummaryRows());
+  XLSX.utils.book_append_sheet(wb, ws, 'Summary');
+  XLSX.writeFile(wb,'personal_finance_summary.xlsx');
+}
+
+/* ================= Pyodide ================= */
+async function initPy(){
+  const ps=document.getElementById('ps-status'), lp=document.getElementById('lp-status'), fd=document.getElementById('fd-status');
+  try{
+    ps.textContent=lp.textContent=fd.textContent='🔄 Loading Pyodide…';
+    pyodide=await loadPyodide({indexURL:'https://cdn.jsdelivr.net/pyodide/v0.26.0/full/'});
+    ps.textContent=lp.textContent=fd.textContent='📦 Loading packages…';
+    await pyodide.loadPackage(['numpy','pandas','matplotlib']);
+    ps.textContent=lp.textContent=fd.textContent='🔧 Preparing functions…';
+    pyodide.runPython(`
+import io, base64, math, json, datetime as dt
+import numpy as np, pandas as pd
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+def b64(fig):
+    buf=io.BytesIO()
+    fig.savefig(buf,format='png',dpi=144,bbox_inches='tight')
+    buf.seek(0)
+    s=base64.b64encode(buf.read()).decode()
+    plt.close(fig)
+    return s
+
+def sf(x):
+    try: return float(x)
+    except: return 0.0
+
+def tvm(rate,n,pv,pmt,fv,solve='pv'):
+    r=rate
+    if solve=='fv': return {'fv': (pv + pmt*n) if r==0 else pv*(1+r)**n + pmt*(((1+r)**n-1)/r)}
+    if solve=='pv': return {'pv': (fv - pmt*n) if r==0 else (fv - pmt*(((1+r)**n-1)/r))/((1+r)**n)}
+    if solve=='pmt': return {'pmt': (fv - pv)/n if r==0 else (fv - pv*(1+r)**n)*r/(((1+r)**n)-1)}
+    if solve=='n':
+        if r==0: return {'n': (fv - pv)/pmt if pmt!=0 else float('nan')}
+        A=pv + pmt/r
+        return {'n': float('nan') if A<=0 else math.log((fv + pmt/r)/A, 1+r)}
+    return {}
+
+def tvm_path_chart(rate,n,pv,pmt):
+    r=rate
+    n=max(0,int(n))
+    vals=[pv]
+    v=pv
+    for t in range(1,n+1):
+        v = v*(1+r) + pmt
+        vals.append(v)
+    fig,ax=plt.subplots(figsize=(7,4))
+    ax.plot(range(len(vals)), vals, marker='o')
+    ax.set_title('TVM Projection'); ax.set_xlabel('Period'); ax.set_ylabel('Value')
+    ax.grid(True,alpha=.3)
+    return {'values': list(vals), 'chart': b64(fig)}  # ensure plain list
+
+def property_valuation(price,app,years,monthly_rent,occ,exp,cap,disc_rate=None):
+    n=int(years)
+    rent=0.0 if monthly_rent is None else monthly_rent
+    occ/=100.0; exp/=100.0; cap/=100.0
+    disc=cap if disc_rate is None else disc_rate/100.0
+    vals=[price*((1+app)**t) for t in range(n+1)]
+    if rent>0:
+        eff=rent*12*occ; noi_now=eff*(1-exp)
+        cf=[rent*12*(1+app)**(t-1)*occ*(1-exp) for t in range(1,n+1)]
+        term=cf[-1]/cap if cap>0 and cf else 0
+        dcf=sum(cf[i-1]/((1+disc)**i) for i in range(1,n+1)) + (term/((1+disc)**n) if term else 0)
+        cap_val=noi_now/cap if cap>0 else float('nan')
+    else:
+        noi_now=price*cap
+        cap_val=price
+        cf=[noi_now*((1+app)**(t-1)) for t in range(1,n+1)]
+        term=cf[-1]/cap if cap>0 and cf else 0
+        dcf=sum(cf[i-1]/((1+disc)**i) for i in range(1,n+1)) + (term/((1+disc)**n) if term else 0)
+    fig,ax=plt.subplots(figsize=(8,5))
+    ax.plot(range(n+1),vals,marker='o')
+    ax.set_title('Projected Property Value'); ax.set_xlabel('Year'); ax.set_ylabel('Value'); ax.grid(True)
+    return {'value_path':vals,'cap_value_today':cap_val,'noi_now':noi_now,'dcf_value':dcf,'chart':b64(fig)}
+
+def monthly_cash_flow(income,biz,fixed,variable,emi,invest):
+    inflow=sf(income)+sf(biz)
+    out=sf(fixed)+sf(variable)+sf(emi)+sf(invest)
+    net=inflow-out
+    fig,ax=plt.subplots(figsize=(7,4))
+    cats=['Inflow','Fixed','Variable','EMI','Invest','Net']; vals=[inflow,fixed,variable,emi,invest,net]
+    ax.bar(cats,vals); ax.set_title('Monthly Cash Flow'); ax.grid(axis='y',alpha=.3)
+    chart=b64(fig)
+    return {'inflow':inflow,'outflow':out,'net':net,'chart':chart}
+
+def net_balance(liq,inv,oth,st,lt):
+    assets=sf(liq)+sf(inv)+sf(oth); liabs=sf(st)+sf(lt); net=assets-liabs
+    fig,ax=plt.subplots(figsize=(7,4))
+    ax.bar(['Assets','Liabilities','Net'],[assets,liabs,net]); ax.set_title('Net Worth Snapshot'); ax.grid(axis='y',alpha=.3)
+    return {'assets':assets,'liabs':liabs,'net':net,'chart':b64(fig)}
+
+def build_context(tvmj,propj,cfj,nbj):
+    p=[]
+    if tvmj: p.append(f"TVM: {tvmj}")
+    if propj: p.append(f"Property: NOI_now={propj.get('noi_now',0):,.0f}, CapVal={propj.get('cap_value_today',0):,.0f}, DCF={propj.get('dcf_value',0):,.0f}")
+    if cfj: p.append(f"CashFlow: inflow={cfj.get('inflow',0):,.0f}, outflow={cfj.get('outflow',0):,.0f}, net={cfj.get('net',0):,.0f}")
+    if nbj: p.append(f"NetBalance: assets={nbj.get('assets',0):,.0f}, liabs={nbj.get('liabs',0):,.0f}, net={nbj.get('net',0):,.0f}")
+    return " | ".join(p)
+
+def months_between(start_iso,end_ym):
+    y,m=map(int,end_ym.split('-'))
+    s=dt.date.fromisoformat(start_iso)
+    e=dt.date(y,m,1)
+    n=(e.year-s.year)*12+(e.month-s.month)
+    return max(1,n)
+
+def annuity_fv(rm,n,p): return p*n if rm==0 else p*((1+rm)**n -1)/rm
+def lump_fv(rm,n,pv): return pv*(1+rm)**n
+
+def rd_fv(rm,n,p,reinvest=True):
+    if reinvest: return annuity_fv(rm,n,p)
+    if rm==0: return p*n
+    tot=0.0
+    for k in range(1,n+1):
+        months=n-k+1
+        tot+=p*(1+rm*months)
+    return tot
+
+def solve_required_pmt(goal,fv_c,n,rm_sip,rm_rd,split_sip,reinvest=True):
+    A_sip=annuity_fv(rm_sip,n,1.0)
+    A_rd=rd_fv(rm_rd,n,1.0,reinvest)
+    denom=split_sip*A_sip+(1-split_sip)*A_rd
+    if denom<=0: return float('nan'),A_sip,A_rd
+    X=max(0.0,(goal-fv_c)/denom)
+    return X,A_sip,A_rd
+
+def project_schedule(start_iso,end_ym,goal,corpus,ra_c,ra_sip,ra_rd,split_pct=.6,reinvest=True,mode='pmt',monthly_amt=30000):
+    n=months_between(start_iso,end_ym)
+    rm_c=ra_c/100/12; rm_s=ra_sip/100/12; rm_r=ra_rd/100/12
+    fv_c=lump_fv(rm_c,n,corpus)
+    pmt_total=solve_required_pmt(goal,fv_c,n,rm_s,rm_r,split_pct,reinvest)[0] if mode=='pmt' else monthly_amt
+    sip_p=pmt_total*split_pct; rd_p=pmt_total*(1-split_pct)
+    s=dt.date.fromisoformat(start_iso)
+    rows=[]; sip=0.0; rd=0.0
+    import pandas as pd, matplotlib.pyplot as plt
+    for t in range(1,n+1):
+        d=s + pd.DateOffset(months=t)
+        sip=sip*(1+rm_s)+sip_p
+        rd=rd*(1+rm_r)+rd_p if reinvest else rd+rd_p
+        rows.append({'t':t,'month':f"{d.year}-{int(d.month):02d}",'sip_contrib':sip_p,'rd_contrib':rd_p,'sip_balance':sip,'rd_balance':rd,'total_balance':sip+rd})
+    df=pd.DataFrame(rows)
+    total=df['total_balance'].iloc[-1]+fv_c
+    fig,ax=plt.subplots(figsize=(8,4.6))
+    ax.plot(df['t'],df['sip_balance'],label='SIP')
+    ax.plot(df['t'],df['rd_balance'],label='RD' + (' (reinvest)' if reinvest else ' (payout)'))
+    ax.plot(df['t'],df['total_balance'],label='Total (excl. corpus)')
+    ax.grid(True,alpha=.3); ax.legend(); ax.set_xlabel('Month'); ax.set_ylabel('Value')
+    chart=b64(fig)
+    gap=goal-total if mode=='fv' else goal-(fv_c + (sip_p*annuity_fv(rm_s,n,1.0) + rd_p*rd_fv(rm_r,n,1.0,reinvest)))
+    return df.to_dict('records'), {'months':n,'required_monthly':pmt_total if mode=='pmt' else None,'sip_pmt':sip_p,'rd_pmt':rd_p,'fv_corpus':fv_c,'fv_total_incl_corpus':total,'gap_to_goal':gap}, chart
+
+def fd_ladder_sim(total,start_iso,horizon_months=36,terms=(3,6,9,12),rate_annual=7.0,mode='reinvest'):
+    rm=rate_annual/100/12
+    terms=sorted(set(int(t) for t in terms if int(t)>0))
+    terms=terms or [12]
+    N=len(terms); per=total/N; minstep=min(terms)
+    rungs=[{'term':terms[i],'offset':(i*minstep)%terms[i],'balance':0.0} for i in range(N)]
+    for r in rungs: r['balance']=per if r['offset']==0 else 0.0
+    import pandas as pd, matplotlib.pyplot as plt
+    rows=[]; tot_mat=0; s=dt.date.fromisoformat(start_iso)
+    for t in range(1,horizon_months+1):
+        d=s + pd.DateOffset(months=t)
+        label=f"{d.year}-{int(d.month):02d}"
+        payouts=0.0; mats=0; total_b=0.0
+        for r in rungs:
+            if t==r['offset']: r['balance']=per
+            if mode=='payout':
+                payouts+=r['balance']*rm; total_b+=r['balance']
+                if (t-r['offset'])>0 and ((t-r['offset'])%r['term']==0): mats+=1
+            else:
+                r['balance']*=(1+rm); total_b+=r['balance']
+                if (t-r['offset'])>0 and ((t-r['offset'])%r['term']==0): mats+=1
+        tot_mat+=mats
+        rows.append({'t':t,'month':label,'book_value':total_b,'interest_payout':payouts,'maturities':mats})
+    df=pd.DataFrame(rows)
+    fig,ax=plt.subplots(figsize=(8,4.6))
+    ax.plot(df['t'],df['book_value'],label='Book Value')
+    if mode=='payout':
+        ax.plot(df['t'],df['interest_payout'],label='Monthly Interest Payout')
+    ax.grid(True,alpha=.3); ax.legend(); ax.set_xlabel('Month'); ax.set_ylabel('₹')
+    chart=b64(fig)
+    avg_payout = df['interest_payout'].mean() if 'interest_payout' in df.columns else 0.0
+    return df.to_dict('records'), {'rungs':N,'per_rung':per,'terms':terms,'mode':mode,'rate_annual':rate_annual,'total_maturities':tot_mat,'final_book_value':df['book_value'].iloc[-1],'avg_payout_per_month':avg_payout}, chart
+    `);
+    ps.textContent=lp.textContent=fd.textContent='✅ Ready'; ps.className=lp.className=fd.className='text-success small';
+  }catch(e){ ps.textContent=lp.textContent=fd.textContent='❌ Init failed: '+(e?.message||e); ps.className=lp.className=fd.className='text-danger small'; console.error(e); }
+}
+
+/* ================= Personal Studio handlers ================= */
+function psBuildContext(){
+  try{
+    const ctx=pyodide.runPython(`build_context(globals().get('last_tvm'),globals().get('last_prop'),globals().get('last_cf'),globals().get('last_nb'))`);
+    try{return ctx.toJs()}catch(_){return String(ctx)}
+  }catch(_){return ''}
+}
+function pySet(name,obj){ try{pyodide.globals.set(name,obj)}catch(_){} }
+
+function psHandleTVM(){
+  const solve=document.getElementById('ps-tvmSolve').value;
+  const rate=Number(document.getElementById('ps-tvmRate').value);  // % per period
+  const nRaw=Number(document.getElementById('ps-tvmN').value), pvRaw=Number(document.getElementById('ps-tvmPV').value);
+  const pmtRaw=Number(document.getElementById('ps-tvmPMT').value), fvRaw=Number(document.getElementById('ps-tvmFV').value);
+
+  psState.inputs.tvm = {solve, rate, n:nRaw, pv:pvRaw, pmt:pmtRaw, fv:fvRaw};
+
+  const r=rate/100;
+  const res=pyodide.runPython(`tvm(${r},${nRaw},${pvRaw},${pmtRaw},${fvRaw},solve='${solve}')`).toJs({dict_hook:Object});
+  psState.outputs.tvm = res;
+  pySet('last_tvm',res);
+
+  const k=Object.keys(res)[0]; 
+  document.getElementById('ps-tvmOut').textContent=`${k.toUpperCase()}: ₹${fmtINR(res[k])}`;
+
+  // Effective params for path + facts (use current inputs; not the solve target)
+  const nEff = Math.max(0, Math.round(solve==='n' ? Number(res.n||nRaw) : nRaw));
+  const pvEff = solve==='pv' ? Number(res.pv||pvRaw) : pvRaw;
+  const pmtEff = solve==='pmt' ? Number(res.pmt||pmtRaw) : pmtRaw;
+
+  // Build path + chart
+  try{
+    const path=pyodide.runPython(`tvm_path_chart(${r},${nEff},${pvEff},${pmtEff})`).toJs({dict_hook:Object});
+    psState.outputs.tvm_path = Array.isArray(path.values) ? path.values : [];
+    document.getElementById('ps-tvmChart').src='data:image/png;base64,'+path.chart;
+  }catch(_){ psState.outputs.tvm_path = []; document.getElementById('ps-tvmFacts').textContent='(Projection unavailable for current inputs)'; }
+
+  // --- FIX: compute final via exact formula so facts always match the solver ---
+  const finalVal = r===0 ? (pvEff + pmtEff*nEff) : (pvEff*Math.pow(1+r,nEff) + pmtEff*((Math.pow(1+r,nEff)-1)/r));
+  const totalContrib = pvEff + (pmtEff*nEff);     // principal contributed
+  const growth = finalVal - totalContrib;         // pure growth from compounding
+  document.getElementById('ps-tvmFacts').textContent =
+    `Projection (${nEff} periods): Final ≈ ₹${fmtINR(finalVal)} • Contributions ₹${fmtINR(totalContrib)} • Growth ₹${fmtINR(growth)}`;
+
+  renderPSSummary();
+}
+
+function psHandleProperty(){
+  const price=Number(document.getElementById('ps-propPrice').value);
+  const app=Number(document.getElementById('ps-propApp').value);
+  const yrs=Number(document.getElementById('ps-propYears').value);
+  const rentRaw=document.getElementById('ps-propRent').value; 
+  const rent=(rentRaw===''||rentRaw===null)?null:Number(rentRaw);
+  const occ=Number(document.getElementById('ps-propOcc').value), exp=Number(document.getElementById('ps-propExp').value), cap=Number(document.getElementById('ps-propCap').value);
+
+  psState.inputs.property = {price, app, years:yrs, rent, occ, exp, cap};
+
+  const res=pyodide.runPython(`property_valuation(${price},${app/100},${yrs},${rent==null?'None':rent},${occ},${exp},${cap})`).toJs({dict_hook:Object});
+  psState.outputs.property = res;
+  pySet('last_prop',res);
+
+  document.getElementById('ps-propOut').textContent=`NOI ₹${fmtINR(res.noi_now)} | CapVal ₹${fmtINR(res.cap_value_today)} | DCF ₹${fmtINR(res.dcf_value)}`;
+  document.getElementById('ps-propChart').src='data:image/png;base64,'+res.chart;
+  setSignal(document.getElementById('ps-propSignal'), (res.cap_value_today||0)-price);
+  renderPSSummary();
+}
+
+function psHandleCF(){
+  const cf={ income:Number(document.getElementById('ps-cfIncome').value), biz:Number(document.getElementById('ps-cfBiz').value), fixed:Number(document.getElementById('ps-cfFix').value), variable:Number(document.getElementById('ps-cfVar').value), emi:Number(document.getElementById('ps-cfEmi').value), invest:Number(document.getElementById('ps-cfInv').value) };
+  psState.inputs.cashflow = {...cf};
+
+  const res=pyodide.runPython(`monthly_cash_flow(${cf.income},${cf.biz},${cf.fixed},${cf.variable},${cf.emi},${cf.invest})`).toJs({dict_hook:Object});
+  psState.outputs.cashflow = res;
+  pySet('last_cf',res);
+
+  document.getElementById('ps-cfOut').textContent=`Net / month: ₹${fmtINR(res.net)} (Inflow ₹${fmtINR(res.inflow)}, Outflow ₹${fmtINR(res.outflow)})`;
+  document.getElementById('ps-cfChart').src='data:image/png;base64,'+res.chart; 
+  setSignal(document.getElementById('ps-cfSignal'),res.net);
+  renderPSSummary();
+}
+
+function psHandleNB(){
+  const nb={ liquid:Number(document.getElementById('ps-nbLiquid').value), invest:Number(document.getElementById('ps-nbInvest').value), other:Number(document.getElementById('ps-nbOther').value), st:Number(document.getElementById('ps-nbStLiab').value), lt:Number(document.getElementById('ps-nbLtLiab').value) };
+  psState.inputs.net = {...nb};
+
+  const res=pyodide.runPython(`net_balance(${nb.liquid},${nb.invest},${nb.other},${nb.st},${nb.lt})`).toJs({dict_hook:Object});
+  psState.outputs.net = res;
+  pySet('last_nb',res);
+
+  document.getElementById('ps-nbOut').textContent=`Assets ₹${fmtINR(res.assets)} | Liabs ₹${fmtINR(res.liabs)} | Net ₹${fmtINR(res.net)}`;
+  document.getElementById('ps-nbChart').src='data:image/png;base64,'+res.chart; 
+  setSignal(document.getElementById('ps-nbSignal'),res.net);
+  renderPSSummary();
+}
+
+/* ================= Ladder handlers ================= */
+function lpReadInputs(){
+  const now=new Date(); const goalDate=document.getElementById('lp-goalDate').value || `${now.getFullYear()+3}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const startDate=document.getElementById('lp-startDate').value || new Date().toISOString().slice(0,10);
+  const split=Math.max(0,Math.min(100,Number(document.getElementById('lp-splitSip').value)))/100;
+  return {goalAmt:Number(document.getElementById('lp-goalAmt').value), goalDate, startDate, currentCorpus:Number(document.getElementById('lp-currentCorpus').value), corpusRate:Number(document.getElementById('lp-corpusRate').value), sipRate:Number(document.getElementById('lp-sipRate').value), rdRate:Number(document.getElementById('lp-rdRate').value), split, reinvest:document.getElementById('lp-rdMode').value==='reinvest', solve:document.getElementById('lp-solveMode').value, monthlyAmt:Number(document.getElementById('lp-monthlyAmt').value)};
+}
+function lpRun(){
+  const p=lpReadInputs();
+  try{
+    const py=`project_schedule('${p.startDate}','${p.goalDate}',${p.goalAmt},${p.currentCorpus},${p.corpusRate},${p.sipRate},${p.rdRate},split_pct=${p.split},reinvest=${p.reinvest?'True':'False'},mode='${p.solve}',monthly_amt=${p.monthlyAmt})`;
+    const out=pyodide.runPython(py).toJs({dict_hook:Object}); lpDF=out[0]; lpSummary=out[1];
+    const r=lpSummary, lines=[]; lines.push(`Months: ${r.months}`); if(r.required_monthly!==null){lines.push(`Required monthly: ₹${fmtINR(r.required_monthly)}`)}
+    lines.push(`SIP per month: ₹${fmtINR(r.sip_pmt)} | RD per month: ₹${fmtINR(r.rd_pmt)}`);
+    lines.push(`FV of current corpus: ₹${fmtINR(r.fv_corpus)}`); lines.push(`Projected FV (incl. corpus): ₹${fmtINR(r.fv_total_incl_corpus)}`); lines.push(`Gap to goal: ₹${fmtINR(r.gap_to_goal)}`);
+    document.getElementById('lp-results').textContent=lines.join('\n'); document.getElementById('lp-chart').src='data:image/png;base64,'+out[2];
+    const tb=document.querySelector('#lp-schedTable tbody'); tb.innerHTML=''; lpDF.forEach((row,i)=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${row.month}</td><td>₹${fmtINR(row.sip_contrib)}</td><td>₹${fmtINR(row.rd_contrib)}</td><td>₹${fmtINR(row.sip_balance)}</td><td>₹${fmtINR(row.rd_balance)}</td><td>₹${fmtINR(row.total_balance)}</td>`; tb.appendChild(tr);});
+  }catch(e){ document.getElementById('lp-results').textContent='Error: '+(e?.message||e); }
+}
+
+/* ================= FD handlers ================= */
+function fdReadInputs(){
+  const termsSel=Array.from(document.getElementById('fd-terms').selectedOptions).map(o=>Number(o.value));
+  return { total:Number(document.getElementById('fd-total').value), start:document.getElementById('fd-start').value || new Date().toISOString().slice(0,10), horizon:Number(document.getElementById('fd-horizon').value), rate:Number(document.getElementById('fd-rate').value), terms:termsSel.length?termsSel:[3,6,9,12], mode:document.getElementById('fd-mode').value };
+}
+function fdRun(){
+  const p=fdReadInputs();
+  try{
+    const out=pyodide.runPython(`fd_ladder_sim(${p.total},'${p.start}',${p.horizon},${JSON.stringify(p.terms)},${p.rate},mode='${p.mode}')`).toJs({dict_hook:Object});
+    fdSim=out[0]; fdSummary=out[1];
+    const s=fdSummary, lines=[]; lines.push(`Rungs: ${s.rungs} (terms: ${s.terms.join('/')})`); lines.push(`Per rung principal: ₹${fmtINR(s.per_rung)} | Mode: ${s.mode} | Rate: ${s.rate_annual}%`); lines.push(`Final book value: ₹${fmtINR(s.final_book_value)}`); if(p.mode==='payout'){lines.push(`Avg monthly interest payout: ₹${fmtINR(s.avg_payout_per_month)}`)}; lines.push(`Maturities (count over horizon): ${s.total_maturities}`);
+    document.getElementById('fd-results').textContent=lines.join('\n'); document.getElementById('fd-chart').src='data:image/png;base64,'+out[2];
+    const tb=document.querySelector('#fd-table tbody'); tb.innerHTML=''; fdSim.forEach((row,i)=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${row.month}</td><td>₹${fmtINR(row.book_value)}</td><td>${p.mode==='payout'?'₹'+fmtINR(row.interest_payout):'-'}</td><td>${row.maturities}</td>`; tb.appendChild(tr); });
+  }catch(e){ document.getElementById('fd-results').textContent='Error: '+(e?.message||e); }
+}
+
+/* ================= Exports (LP + FD) ================= */
+function lpExportExcel(){ if(!lpDF){alert('Run the planner first.');return;} const wb=XLSX.utils.book_new(); const rows=[['#','Month','SIP Contrib','RD Contrib','SIP Balance','RD Balance','Total Balance']]; lpDF.forEach((r,i)=>rows.push([i+1,r.month,r.sip_contrib,r.rd_contrib,r.sip_balance,r.rd_balance,r.total_balance])); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Schedule'); const s=lpSummary||{}; XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Metric','Value'],['Months',s.months],['Required monthly',s.required_monthly],['SIP per month',s.sip_pmt],['RD per month',s.rd_pmt],['FV current corpus',s.fv_corpus],['Projected FV (incl corpus)',s.fv_total_incl_corpus],['Gap to goal',s.gap_to_goal]]),'Summary'); XLSX.writeFile(wb,'ladder_planner.xlsx'); }
+function lpExportCSV(){ if(!lpDF){alert('Run the planner first.');return;} const parts=['Index,Month,SIP Contrib,RD Contrib,SIP Balance,RD Balance,Total Balance']; lpDF.forEach((r,i)=>parts.push([i+1,r.month,r.sip_contrib,r.rd_contrib,r.sip_balance,r.rd_balance,r.total_balance].join(','))); const blob=new Blob([parts.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ladder_planner.csv'; a.click(); }
+function fdExportExcel(){ if(!fdSim){alert('Build the ladder first.');return;} const wb=XLSX.utils.book_new(); const rows=[['#','Month','Book Value','Interest Payout','Maturities']]; fdSim.forEach((r,i)=>rows.push([i+1,r.month,r.book_value,r.interest_payout||0,r.maturities])); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'FD Simulation'); const s=fdSummary||{}; XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Rungs',s.rungs],['Terms',(s.terms||[]).join('/')],['Per rung',s.per_rung],['Mode',s.mode],['Rate %',s.rate_annual],['Final book value',s.final_book_value],['Avg payout / mo',s.avg_payout_per_month],['Maturities',s.total_maturities]]),'Summary'); XLSX.writeFile(wb,'fd_ladder.xlsx'); }
+function fdExportCSV(){ if(!fdSim){alert('Build the ladder first.');return;} const parts=['Index,Month,Book Value,Interest Payout, Maturities']; fdSim.forEach((r,i)=>parts.push([i+1,r.month,r.book_value,r.interest_payout||0,r.maturities].join(','))); const blob=new Blob([parts.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='fd_ladder.csv'; a.click(); }
+
+/* ================= OpenAI Panel ================= */
+function getStoredKey(){ return localStorage.getItem('openai_key_global') || '' }
+function saveKeyIf(val){ if(document.getElementById('ai-remember').checked){ localStorage.setItem('openai_key_global', val) } else { localStorage.removeItem('openai_key_global') } }
+
+function contextPS(){ const ctx=psBuildContext(); return ctx || 'No Personal Studio calculations yet.' }
+function contextLP(){ if(!lpSummary) return 'No SIP/RD plan has been computed yet.'; const s=lpSummary; return `SIP/RD Summary: months=${s.months}, req_monthly=${s.required_monthly}, sip_pmt=${s.sip_pmt}, rd_pmt=${s.rd_pmt}, fv_corpus=${s.fv_corpus}, fv_total=${s.fv_total_incl_corpus}, gap_to_goal=${s.gap_to_goal}` }
+function contextFD(){ if(!fdSummary) return 'No FD ladder computed yet.'; const s=fdSummary; return `FD Ladder Summary: rungs=${s.rungs}, terms=${(s.terms||[]).join('/')}, per_rung=${s.per_rung}, mode=${s.mode}, rate=${s.rate_annual}, final_book=${s.final_book_value}, avg_payout=${s.avg_payout_per_month}, maturities=${s.total_maturities}` }
+
+async function callOpenAI({key,model,prompt}){
+  const resp=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model,temperature:0.3,messages:[{role:'system',content:'You are a helpful financial planning assistant. Keep answers concise and actionable.'},{role:'user',content:prompt}]})});
+  if(!resp.ok) throw new Error(`OpenAI error ${resp.status}`);
+  const data=await resp.json(); return (data?.choices?.[0]?.message?.content||'').trim();
+}
+
+function currentContext(){
+  if(activeTab==='ps') return contextPS();
+  if(activeTab==='lp') return contextLP();
+  return contextFD();
+}
+function updateScopeLabel(){
+  document.getElementById('ai-scope').textContent = activeTab==='ps' ? 'Personal Studio' : activeTab==='lp' ? 'SIP/RD Planner' : 'FD Ladder';
+}
+
+/* ================= Wire UI ================= */
+window.addEventListener('DOMContentLoaded', ()=>{
+  const now=new Date(); 
+  document.getElementById('lp-startDate').value=toISODate(now); 
+  const g=new Date(now.getFullYear()+3,now.getMonth(),1); 
+  document.getElementById('lp-goalDate').value=`${g.getFullYear()}-${String(g.getMonth()+1).padStart(2,'0')}`; 
+  document.getElementById('fd-start').value=toISODate(now);
+
+  initPy();
+
+  // PS buttons
+  document.getElementById('ps-tvmCalc').addEventListener('click', psHandleTVM);
+  document.getElementById('ps-propCalc').addEventListener('click', psHandleProperty);
+  document.getElementById('ps-cfCalc').addEventListener('click', psHandleCF);
+  document.getElementById('ps-nbCalc').addEventListener('click', psHandleNB);
+
+  // PS summary exports
+  document.getElementById('ps-export-csv').addEventListener('click', psExportCSV);
+  document.getElementById('ps-export-xlsx').addEventListener('click', psExportXLSX);
+
+  // Live refresh of health as the user edits inputs (no need to press Compute)
+  document.querySelectorAll('#pane-ps input').forEach(el=>{
+    el.addEventListener('input', ()=>{
+      psSyncInputsFromDOM();
+      renderHealth();
+    });
+  });
+
+  // Initial render
+  renderPSSummary();
+
+  // Ladder buttons
+  document.getElementById('lp-runBtn').addEventListener('click', lpRun);
+  document.getElementById('lp-exportXlsx').addEventListener('click', lpExportExcel);
+  document.getElementById('lp-exportCsv').addEventListener('click', lpExportCSV);
+
+  // FD buttons
+  document.getElementById('fd-run').addEventListener('click', fdRun);
+  document.getElementById('fd-exportXlsx').addEventListener('click', fdExportExcel);
+  document.getElementById('fd-exportCsv').addEventListener('click', fdExportCSV);
+
+  // Tabs
+  document.querySelectorAll('#toolTabs button[data-bs-toggle="tab"]').forEach(btn=>{
+    bootstrap.Tab.getOrCreateInstance(btn);
+    btn.addEventListener('shown.bs.tab', (e)=>{
+      const id=e.target.id;
+      activeTab = id==='tab-ps' ? 'ps' : id==='tab-lp' ? 'lp' : 'fd';
+      updateScopeLabel();
+      window.dispatchEvent(new Event('resize'));
+    });
+  });
+
+  // Floating AI
+  const aiKey=document.getElementById('ai-key'); const aiModel=document.getElementById('ai-model');
+  const aiInsert=document.getElementById('ai-insert'); const aiRun=document.getElementById('ai-run');
+  const aiStatus=document.getElementById('ai-status'); const aiOut=document.getElementById('ai-out'); const aiPrompt=document.getElementById('ai-prompt');
+  const aiRemember=document.getElementById('ai-remember'); const aiPanel=document.getElementById('aiPanel'); const aiMini=document.getElementById('aiMini');
+
+  const stored=getStoredKey(); if(stored){ aiKey.value=stored; aiRemember.checked=true; }
+  updateScopeLabel();
+
+  aiInsert.addEventListener('click', ()=>{
+    const ctx=currentContext(); const base=aiPrompt.value.trim(); aiPrompt.value=(base?base+'\n\n':'')+`Context:\n${ctx}\n\nInstruction:`;
+  });
+
+  aiRun.addEventListener('click', async ()=>{
+    try{
+      aiStatus.innerHTML='<span class="spinner"></span> Thinking…';
+      aiOut.textContent='—';
+      const key=aiKey.value.trim(); if(!key){ aiStatus.textContent='Enter API key.'; return; }
+      saveKeyIf(key);
+      const model=aiModel.value; const prompt=aiPrompt.value.trim() || `Summarize and give 3 actions:\n${currentContext()}`;
+      const text=await callOpenAI({key,model,prompt}); 
+      const normalized = text ? text.replace(/\$/g, '₹') : '';
+      aiOut.textContent=normalized || '(No content)'; aiStatus.textContent='Done.';
+    }catch(err){ aiStatus.textContent=String(err.message||err); console.error(err); }
+  });
+
+  document.getElementById('aiCollapse').addEventListener('click', ()=>{
+    aiPanel.classList.add('ai-hide'); aiMini.style.display='inline-block';
+  });
+  aiMini.addEventListener('click', ()=>{
+    aiPanel.classList.remove('ai-hide'); aiMini.style.display='none';
+  });
+});
+</script>
+</body>
+</html>
