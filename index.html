@@ -5,6 +5,11 @@
 <title>Finance Tools — Personal Studio • SIP/RD Ladder • FD Ladder (Pyodide)</title>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+<script>
+// LINE 10: Hardcoded default OpenAI API key (user-entered key overrides this)
+const DEFAULT_OPENAI_KEY = '';
+
+</script>
 <style>
   :root{ --ink:#0f172a; --muted:#677084; --soft:#e7eef5; --brand:#2563eb; --brand2:#7c3aed; }
   body{background:#f7f9fc;color:var(--ink)}
@@ -31,14 +36,12 @@
   .spinner{display:inline-block;width:1rem;height:1rem;border:2px solid #cbd5e1;border-top-color:#2563eb;border-radius:50%;animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
 
-  /* Tabs: make visible & clickable, pretty */
   .tabs-wrapper{position:sticky;top:10px;z-index:5}
   .nav-tabs{background:#fff;border-radius:12px;padding:6px;border:1px solid var(--soft)}
   .nav-tabs .nav-link{color:var(--ink);font-weight:600;border:0;border-radius:10px;padding:.5rem .9rem;opacity:.9}
   .nav-tabs .nav-link:hover{opacity:1;background:#f1f5ff}
   .nav-tabs .nav-link.active{background:#fff;box-shadow:0 6px 16px rgba(16,24,40,.08);outline:2px solid #e5ebff;opacity:1}
 
-  /* Floating Ask-AI Panel */
   .ai-panel{
     position:fixed; right:18px; top:110px; width:360px; max-height:calc(100vh - 140px);
     background:#fff; border:1px solid var(--soft); border-radius:16px; box-shadow:0 16px 40px rgba(16,24,40,.14);
@@ -99,14 +102,20 @@
             <h5 class="section-title mb-3">⏳ Time Value of Money (TVM)</h5>
             <div class="row g-2">
               <div class="col-6"><label class="form-label mb-1">Solve for</label>
-                <select id="ps-tvmSolve" class="form-select"><option value="fv">FV</option><option value="pv" selected>PV</option><option value="pmt">PMT</option><option value="n">N (periods)</option></select></div>
-              <div class="col-6"><label class="form-label mb-1">Rate (%/period)</label><input id="ps-tvmRate" type="number" step="0.0001" class="form-control" value="1"></div>
-              <div class="col-4"><label class="form-label mb-1">N (periods)</label><input id="ps-tvmN" type="number" step="1" class="form-control" value="12"></div>
+                <select id="ps-tvmSolve" class="form-select"><option value="fv" selected>FV</option><option value="pv">PV</option><option value="pmt">PMT</option><option value="n">N (periods)</option></select></div>
+              <div class="col-6"><label class="form-label mb-1">Rate (%/period)</label><input id="ps-tvmRate" type="number" step="0.0001" class="form-control" value="2.5"></div>
+              <div class="col-4"><label class="form-label mb-1">N (periods)</label><input id="ps-tvmN" type="number" step="1" class="form-control" value="5"></div>
               <div class="col-4"><label class="form-label mb-1">PV</label><input id="ps-tvmPV" type="number" step="0.01" class="form-control" value="100000"></div>
               <div class="col-4"><label class="form-label mb-1">PMT (each)</label><input id="ps-tvmPMT" type="number" step="0.01" class="form-control" value="0"></div>
               <div class="col-12"><label class="form-label mb-1">FV</label><input id="ps-tvmFV" type="number" step="0.01" class="form-control" value="0"></div>
             </div>
-            <div class="mt-2 d-flex gap-2"><button id="ps-tvmCalc" class="btn btn-primary">Calculate</button><span id="ps-tvmOut" class="ms-2 fw-bold"></span></div>
+            <div class="mt-2 d-flex gap-2 align-items-center">
+              <button id="ps-tvmCalc" class="btn btn-primary">Calculate</button>
+              <span id="ps-tvmOut" class="ms-2 fw-bold"></span>
+            </div>
+
+            <div class="img-box mt-2"><img id="ps-tvmChart" class="viz-img" alt="TVM Projection"></div>
+            <div id="ps-tvmFacts" class="small-muted mt-1">—</div>
           </div></div>
         </div>
 
@@ -127,7 +136,7 @@
               <span id="ps-propOut" class="fw-bold"></span>
               <span id="ps-propSignal" class="pill ms-2">—</span>
             </div>
-            <div class="img-box mt-2"><img id="ps-propChart" class="viz-img" alt="Appreciation Chart"></div>
+            <div class="img-box mt-2"><img id="ps-propChart" class="viz-img" alt="Projected Property Value"></div>
           </div></div>
         </div>
       </div>
@@ -172,6 +181,38 @@
           </div></div>
         </div>
       </div>
+
+      <!-- ======= Personal Finance Summary ======= -->
+      <div class="card card-soft mt-3">
+        <div class="card-body">
+          <h5 class="section-title mb-2">📑 Personal Finance Summary</h5>
+
+          <div class="table-responsive" style="max-height:340px; overflow:auto">
+            <table class="table table-sm" id="ps-summary-table">
+              <thead class="table-light">
+                <tr>
+                  <th>Section</th><th>Field</th><th>Value</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div class="mt-2 d-flex gap-2">
+            <button id="ps-export-xlsx" class="btn btn-outline btn-sm">Export Excel</button>
+            <button id="ps-export-csv"  class="btn btn-outline btn-sm">Download CSV</button>
+          </div>
+
+          <hr class="my-3"/>
+
+          <div id="ps-health" class="small">
+            <b>Financial health:</b> <span id="ps-health-pill" class="pill">—</span>
+            <div id="ps-health-text" class="mt-2"></div>
+          </div>
+        </div>
+      </div>
+      <!-- ======= /Personal Finance Summary ======= -->
+
     </div>
 
     <!-- ================= Ladder ================= -->
@@ -288,7 +329,7 @@
   </div>
 </div>
 
-<!-- Floating Ask-AI Panel (single shared for all tabs) -->
+<!-- Floating Ask-AI Panel -->
 <div id="aiPanel" class="ai-panel">
   <div class="ai-head">
     <span class="ai-dot"></span>
@@ -296,13 +337,17 @@
     <button id="aiCollapse" class="btn btn-sm btn-outline ms-auto">Minimize</button>
   </div>
   <div class="ai-body">
-    <div class="small-muted mb-2">Key is stored locally if you tick “Remember”. For production, route via a backend proxy.</div>
+    <div class="small-muted mb-2">
+      If you leave the key blank, the app will use the built-in key (line 10).  
+      If you enter a key below, it will override the built-in key for this device.
+    </div>
     <div class="mb-2">
-      <label class="form-label">OpenAI API Key</label>
+      <label class="form-label">OpenAI API Key (optional override)</label>
       <input id="ai-key" class="form-control" type="password" placeholder="sk-...">
       <div class="form-text"><input type="checkbox" id="ai-remember" class="form-check-input me-1">
         <label for="ai-remember">Remember key on this device</label></div>
     </div>
+    
     <div class="row g-2">
       <div class="col-7">
         <label class="form-label">Model</label>
@@ -349,6 +394,153 @@ const fmtINR=x=>{ try{return Number(x).toLocaleString('en-IN',{maximumFractionDi
 const toISODate=d=>d.toISOString().slice(0,10);
 function setSignal(el,val){const n=Number(val||0); el.textContent=n>0?'OK':(n===0?'Neutral':'Warning'); el.className='pill '+(n>0?'pill-ok':n===0?'pill-warn':'pill-bad')}
 
+/* ======= Personal Studio summary state & helpers ======= */
+const psState = {
+  inputs: {
+    tvm: {solve:'fv', rate:2.5, n:5, pv:100000, pmt:0, fv:0},
+    property: {price:6500000, app:6, years:10, rent:null, occ:95, exp:25, cap:6.5},
+    cashflow: {income:200000, biz:40000, fixed:80000, variable:30000, emi:45000, invest:20000},
+    net: {liquid:600000, invest:1200000, other:200000, st:150000, lt:1800000},
+  },
+  outputs: { tvm:null, tvm_path: null, property:null, cashflow:null, net:null }
+};
+
+function addRow(tbody, section, field, value) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${section}</td><td>${field}</td><td>${value}</td>`;
+  tbody.appendChild(tr);
+}
+
+/* ---------- Financial Health (live) ---------- */
+function renderHealth() {
+  const text = document.getElementById('ps-health-text');
+  const pill = document.getElementById('ps-health-pill');
+
+  const cfi = psState.inputs.cashflow, cfo = psState.outputs.cashflow || {};
+  const nbi = psState.inputs.net,      nbo = psState.outputs.net      || {};
+
+  const inflow  = (typeof cfo.inflow === 'number') ? cfo.inflow : (Number(cfi.income||0)+Number(cfi.biz||0));
+  const outflow = (typeof cfo.outflow=== 'number') ? cfo.outflow: (Number(cfi.fixed||0)+Number(cfi.variable||0)+Number(cfi.emi||0)+Number(cfi.invest||0));
+  const netCF   = (typeof cfo.net    === 'number') ? cfo.net    : (inflow - outflow);
+
+  const assets  = (typeof nbo.assets === 'number') ? nbo.assets : (Number(nbi.liquid||0)+Number(nbi.invest||0)+Number(nbi.other||0));
+  const liabs   = (typeof nbo.liabs  === 'number') ? nbo.liabs  : (Number(nbi.st||0)+Number(nbi.lt||0));
+
+  const monthlyExpenses = Number(cfi.fixed||0)+Number(cfi.variable||0)+Number(cfi.emi||0)+Number(cfi.invest||0);
+  const runwayMonths = monthlyExpenses>0 ? Number(nbi.liquid||0)/monthlyExpenses : 0;
+  const savingsRate  = inflow>0 ? Number(cfi.invest||0)/inflow : 0;
+  const debtToAssets = assets>0 ? liabs/assets : 0;
+
+  let score = 0;
+  if (netCF > 0)        score++;
+  if (runwayMonths>=6)  score++;
+  if (savingsRate>=.20) score++;
+  if (debtToAssets<=.5) score++;
+
+  const verdict = score>=3 ? {label:'Healthy', cls:'pill-ok'}
+               : score===2 ? {label:'Watch',   cls:'pill-warn'}
+                            : {label:'Risk',    cls:'pill-bad'};
+
+  pill.textContent = verdict.label;
+  pill.className = `pill ${verdict.cls}`;
+  text.innerHTML = `
+    <ul class="mb-0">
+      <li><b>Net cash flow:</b> ${netCF>0?'Positive':'Negative'} (₹${fmtINR(netCF)})</li>
+      <li><b>Emergency runway:</b> ${runwayMonths.toFixed(1)} months (≥6 months recommended)</li>
+      <li><b>Savings rate:</b> ${(savingsRate*100).toFixed(1)}% (target ≥20%)</li>
+      <li><b>Debt-to-assets:</b> ${(debtToAssets*100).toFixed(1)}% (keep ≤50%)</li>
+    </ul>`;
+}
+
+/* Keep inputs synced (for live health) */
+function psSyncInputsFromDOM(){
+  psState.inputs.cashflow = {
+    income:  Number(document.getElementById('ps-cfIncome').value),
+    biz:     Number(document.getElementById('ps-cfBiz').value),
+    fixed:   Number(document.getElementById('ps-cfFix').value),
+    variable:Number(document.getElementById('ps-cfVar').value),
+    emi:     Number(document.getElementById('ps-cfEmi').value),
+    invest:  Number(document.getElementById('ps-cfInv').value)
+  };
+  psState.inputs.net = {
+    liquid:  Number(document.getElementById('ps-nbLiquid').value),
+    invest:  Number(document.getElementById('ps-nbInvest').value),
+    other:   Number(document.getElementById('ps-nbOther').value),
+    st:      Number(document.getElementById('ps-nbStLiab').value),
+    lt:      Number(document.getElementById('ps-nbLtLiab').value)
+  };
+}
+
+function renderPSSummary() {
+  const tb = document.querySelector('#ps-summary-table tbody');
+  if(!tb) return;
+  tb.innerHTML = '';
+
+  // TVM
+  const tvmi = psState.inputs.tvm, tvmo = psState.outputs.tvm||{};
+  addRow(tb,'TVM (inputs)','Solve for', tvmi.solve.toUpperCase());
+  addRow(tb,'TVM (inputs)','Rate %/period', tvmi.rate);
+  addRow(tb,'TVM (inputs)','N (periods)', tvmi.n);
+  addRow(tb,'TVM (inputs)','PV', `₹${fmtINR(tvmi.pv)}`);
+  addRow(tb,'TVM (inputs)','PMT', `₹${fmtINR(tvmi.pmt)}`);
+  addRow(tb,'TVM (inputs)','FV', `₹${fmtINR(tvmi.fv)}`);
+  Object.entries(tvmo).forEach(([k,v])=> addRow(tb,'TVM (computed)', k.toUpperCase(), `₹${fmtINR(v)}`));
+
+  // Property
+  const pi = psState.inputs.property, po = psState.outputs.property||{};
+  addRow(tb,'Property (inputs)','Purchase Price', `₹${fmtINR(pi.price)}`);
+  addRow(tb,'Property (inputs)','Annual App %', pi.app);
+  addRow(tb,'Property (inputs)','Years', pi.years);
+  addRow(tb,'Property (inputs)','Monthly Rent', pi.rent==null||pi.rent===''?'—':`₹${fmtINR(pi.rent)}`);
+  addRow(tb,'Property (inputs)','Occ. % / Exp % / Cap %', `${pi.occ} / ${pi.exp} / ${pi.cap}`);
+  addRow(tb,'Property (computed)','NOI (now)', po?.noi_now!=null?`₹${fmtINR(po.noi_now)}`:'—');
+  addRow(tb,'Property (computed)','Cap Value Today', po?.cap_value_today!=null?`₹${fmtINR(po.cap_value_today)}`:'—');
+  addRow(tb,'Property (computed)','DCF Value', po?.dcf_value!=null?`₹${fmtINR(po.dcf_value)}`:'—');
+
+  // Cash flow
+  const cfi = psState.inputs.cashflow, cfo = psState.outputs.cashflow||{};
+  addRow(tb,'Cash Flow (inputs)','Income + Biz', `₹${fmtINR(cfi.income + cfi.biz)}`);
+  addRow(tb,'Cash Flow (inputs)','Fixed / Variable / EMI / Invest', `₹${fmtINR(cfi.fixed)} / ₹${fmtINR(cfi.variable)} / ₹${fmtINR(cfi.emi)} / ₹${fmtINR(cfi.invest)}`);
+  addRow(tb,'Cash Flow (computed)','Inflow', cfo?.inflow!=null?`₹${fmtINR(cfo.inflow)}`:'—');
+  addRow(tb,'Cash Flow (computed)','Outflow', cfo?.outflow!=null?`₹${fmtINR(cfo.outflow)}`:'—');
+  addRow(tb,'Cash Flow (computed)','Net / month', cfo?.net!=null?`₹${fmtINR(cfo.net)}`:'—');
+
+  // Net worth
+  const nbi = psState.inputs.net, nbo = psState.outputs.net||{};
+  addRow(tb,'Net Worth (inputs)','Assets (liq/invest/other)', `₹${fmtINR(nbi.liquid)} / ₹${fmtINR(nbi.invest)} / ₹${fmtINR(nbi.other)}`);
+  addRow(tb,'Net Worth (inputs)','Liabilities (ST/LT)', `₹${fmtINR(nbi.st)} / ₹${fmtINR(nbi.lt)}`);
+  addRow(tb,'Net Worth (computed)','Assets', nbo?.assets!=null?`₹${fmtINR(nbo.assets)}`:'—');
+  addRow(tb,'Net Worth (computed)','Liabilities', nbo?.liabs!=null?`₹${fmtINR(nbo.liabs)}`:'—');
+  addRow(tb,'Net Worth (computed)','Net Worth', nbo?.net!=null?`₹${fmtINR(nbo.net)}`:'—');
+
+  renderHealth();
+}
+
+/* ======= CSV/Excel export for PS summary ======= */
+function psSummaryRows() {
+  const rows = [['Section','Field','Value']];
+  document.querySelectorAll('#ps-summary-table tbody tr').forEach(tr=>{
+    const tds=[...tr.querySelectorAll('td')].map(td=>td.textContent);
+    rows.push(tds);
+  });
+  return rows;
+}
+function psExportCSV(){
+  const rows = psSummaryRows();
+  const csv = rows.map(r=>r.map(v=>String(v).includes(',')?`"${v}"`:v).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='personal_finance_summary.csv';
+  a.click();
+}
+function psExportXLSX(){
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(psSummaryRows());
+  XLSX.utils.book_append_sheet(wb, ws, 'Summary');
+  XLSX.writeFile(wb,'personal_finance_summary.xlsx');
+}
+
 /* ================= Pyodide ================= */
 async function initPy(){
   const ps=document.getElementById('ps-status'), lp=document.getElementById('lp-status'), fd=document.getElementById('fd-status');
@@ -387,6 +579,20 @@ def tvm(rate,n,pv,pmt,fv,solve='pv'):
         A=pv + pmt/r
         return {'n': float('nan') if A<=0 else math.log((fv + pmt/r)/A, 1+r)}
     return {}
+
+def tvm_path_chart(rate,n,pv,pmt):
+    r=rate
+    n=max(0,int(n))
+    vals=[pv]
+    v=pv
+    for t in range(1,n+1):
+        v = v*(1+r) + pmt
+        vals.append(v)
+    fig,ax=plt.subplots(figsize=(7,4))
+    ax.plot(range(len(vals)), vals, marker='o')
+    ax.set_title('TVM Projection'); ax.set_xlabel('Period'); ax.set_ylabel('Value')
+    ax.grid(True,alpha=.3)
+    return {'values': list(vals), 'chart': b64(fig)}  # ensure plain list
 
 def property_valuation(price,app,years,monthly_rent,occ,exp,cap,disc_rate=None):
     n=int(years)
@@ -532,35 +738,91 @@ function psBuildContext(){
   }catch(_){return ''}
 }
 function pySet(name,obj){ try{pyodide.globals.set(name,obj)}catch(_){} }
+
 function psHandleTVM(){
   const solve=document.getElementById('ps-tvmSolve').value;
-  const r=Number(document.getElementById('ps-tvmRate').value)/100;
-  const n=Number(document.getElementById('ps-tvmN').value), pv=Number(document.getElementById('ps-tvmPV').value);
-  const pmt=Number(document.getElementById('ps-tvmPMT').value), fv=Number(document.getElementById('ps-tvmFV').value);
-  const res=pyodide.runPython(`tvm(${r},${n},${pv},${pmt},${fv},solve='${solve}')`).toJs({dict_hook:Object});
-  pySet('last_tvm',res); const k=Object.keys(res)[0]; document.getElementById('ps-tvmOut').textContent=`${k.toUpperCase()}: ₹${fmtINR(res[k])}`;
+  const rate=Number(document.getElementById('ps-tvmRate').value);  // % per period
+  const nRaw=Number(document.getElementById('ps-tvmN').value), pvRaw=Number(document.getElementById('ps-tvmPV').value);
+  const pmtRaw=Number(document.getElementById('ps-tvmPMT').value), fvRaw=Number(document.getElementById('ps-tvmFV').value);
+
+  psState.inputs.tvm = {solve, rate, n:nRaw, pv:pvRaw, pmt:pmtRaw, fv:fvRaw};
+
+  const r=rate/100;
+  const res=pyodide.runPython(`tvm(${r},${nRaw},${pvRaw},${pmtRaw},${fvRaw},solve='${solve}')`).toJs({dict_hook:Object});
+  psState.outputs.tvm = res;
+  pySet('last_tvm',res);
+
+  const k=Object.keys(res)[0]; 
+  document.getElementById('ps-tvmOut').textContent=`${k.toUpperCase()}: ₹${fmtINR(res[k])}`;
+
+  // Effective params for path + facts (use current inputs; not the solve target)
+  const nEff = Math.max(0, Math.round(solve==='n' ? Number(res.n||nRaw) : nRaw));
+  const pvEff = solve==='pv' ? Number(res.pv||pvRaw) : pvRaw;
+  const pmtEff = solve==='pmt' ? Number(res.pmt||pmtRaw) : pmtRaw;
+
+  // Build path + chart
+  try{
+    const path=pyodide.runPython(`tvm_path_chart(${r},${nEff},${pvEff},${pmtEff})`).toJs({dict_hook:Object});
+    psState.outputs.tvm_path = Array.isArray(path.values) ? path.values : [];
+    document.getElementById('ps-tvmChart').src='data:image/png;base64,'+path.chart;
+  }catch(_){ psState.outputs.tvm_path = []; document.getElementById('ps-tvmFacts').textContent='(Projection unavailable for current inputs)'; }
+
+  // --- compute final via exact formula so facts always match the solver ---
+  const finalVal = r===0 ? (pvEff + pmtEff*nEff) : (pvEff*Math.pow(1+r,nEff) + pmtEff*((Math.pow(1+r,nEff)-1)/r));
+  const totalContrib = pvEff + (pmtEff*nEff);     // principal contributed
+  const growth = finalVal - totalContrib;         // pure growth from compounding
+  document.getElementById('ps-tvmFacts').textContent =
+    `Projection (${nEff} periods): Final ≈ ₹${fmtINR(finalVal)} • Contributions ₹${fmtINR(totalContrib)} • Growth ₹${fmtINR(growth)}`;
+
+  renderPSSummary();
 }
+
 function psHandleProperty(){
   const price=Number(document.getElementById('ps-propPrice').value);
-  const app=Number(document.getElementById('ps-propApp').value)/100, yrs=Number(document.getElementById('ps-propYears').value);
-  const rentRaw=document.getElementById('ps-propRent').value; const rentArg=(rentRaw===''||rentRaw===null)?'None':Number(rentRaw);
+  const app=Number(document.getElementById('ps-propApp').value);
+  const yrs=Number(document.getElementById('ps-propYears').value);
+  const rentRaw=document.getElementById('ps-propRent').value; 
+  const rent=(rentRaw===''||rentRaw===null)?null:Number(rentRaw);
   const occ=Number(document.getElementById('ps-propOcc').value), exp=Number(document.getElementById('ps-propExp').value), cap=Number(document.getElementById('ps-propCap').value);
-  const res=pyodide.runPython(`property_valuation(${price},${app},${yrs},${rentArg},${occ},${exp},${cap})`).toJs({dict_hook:Object});
-  pySet('last_prop',res); document.getElementById('ps-propOut').textContent=`NOI ₹${fmtINR(res.noi_now)} | CapVal ₹${fmtINR(res.cap_value_today)} | DCF ₹${fmtINR(res.dcf_value)}`;
+
+  psState.inputs.property = {price, app, years:yrs, rent, occ, exp, cap};
+
+  const res=pyodide.runPython(`property_valuation(${price},${app/100},${yrs},${rent==null?'None':rent},${occ},${exp},${cap})`).toJs({dict_hook:Object});
+  psState.outputs.property = res;
+  pySet('last_prop',res);
+
+  document.getElementById('ps-propOut').textContent=`NOI ₹${fmtINR(res.noi_now)} | CapVal ₹${fmtINR(res.cap_value_today)} | DCF ₹${fmtINR(res.dcf_value)}`;
   document.getElementById('ps-propChart').src='data:image/png;base64,'+res.chart;
   setSignal(document.getElementById('ps-propSignal'), (res.cap_value_today||0)-price);
+  renderPSSummary();
 }
+
 function psHandleCF(){
   const cf={ income:Number(document.getElementById('ps-cfIncome').value), biz:Number(document.getElementById('ps-cfBiz').value), fixed:Number(document.getElementById('ps-cfFix').value), variable:Number(document.getElementById('ps-cfVar').value), emi:Number(document.getElementById('ps-cfEmi').value), invest:Number(document.getElementById('ps-cfInv').value) };
+  psState.inputs.cashflow = {...cf};
+
   const res=pyodide.runPython(`monthly_cash_flow(${cf.income},${cf.biz},${cf.fixed},${cf.variable},${cf.emi},${cf.invest})`).toJs({dict_hook:Object});
-  pySet('last_cf',res); document.getElementById('ps-cfOut').textContent=`Net / month: ₹${fmtINR(res.net)} (Inflow ₹${fmtINR(res.inflow)}, Outflow ₹${fmtINR(res.outflow)})`;
-  document.getElementById('ps-cfChart').src='data:image/png;base64,'+res.chart; setSignal(document.getElementById('ps-cfSignal'),res.net);
+  psState.outputs.cashflow = res;
+  pySet('last_cf',res);
+
+  document.getElementById('ps-cfOut').textContent=`Net / month: ₹${fmtINR(res.net)} (Inflow ₹${fmtINR(res.inflow)}, Outflow ₹${fmtINR(res.outflow)})`;
+  document.getElementById('ps-cfChart').src='data:image/png;base64,'+res.chart; 
+  setSignal(document.getElementById('ps-cfSignal'),res.net);
+  renderPSSummary();
 }
+
 function psHandleNB(){
   const nb={ liquid:Number(document.getElementById('ps-nbLiquid').value), invest:Number(document.getElementById('ps-nbInvest').value), other:Number(document.getElementById('ps-nbOther').value), st:Number(document.getElementById('ps-nbStLiab').value), lt:Number(document.getElementById('ps-nbLtLiab').value) };
+  psState.inputs.net = {...nb};
+
   const res=pyodide.runPython(`net_balance(${nb.liquid},${nb.invest},${nb.other},${nb.st},${nb.lt})`).toJs({dict_hook:Object});
-  pySet('last_nb',res); document.getElementById('ps-nbOut').textContent=`Assets ₹${fmtINR(res.assets)} | Liabs ₹${fmtINR(res.liabs)} | Net ₹${fmtINR(res.net)}`;
-  document.getElementById('ps-nbChart').src='data:image/png;base64,'+res.chart; setSignal(document.getElementById('ps-nbSignal'),res.net);
+  psState.outputs.net = res;
+  pySet('last_nb',res);
+
+  document.getElementById('ps-nbOut').textContent=`Assets ₹${fmtINR(res.assets)} | Liabs ₹${fmtINR(res.liabs)} | Net ₹${fmtINR(res.net)}`;
+  document.getElementById('ps-nbChart').src='data:image/png;base64,'+res.chart; 
+  setSignal(document.getElementById('ps-nbSignal'),res.net);
+  renderPSSummary();
 }
 
 /* ================= Ladder handlers ================= */
@@ -599,11 +861,11 @@ function fdRun(){
   }catch(e){ document.getElementById('fd-results').textContent='Error: '+(e?.message||e); }
 }
 
-/* ================= Exports ================= */
+/* ================= Exports (LP + FD) ================= */
 function lpExportExcel(){ if(!lpDF){alert('Run the planner first.');return;} const wb=XLSX.utils.book_new(); const rows=[['#','Month','SIP Contrib','RD Contrib','SIP Balance','RD Balance','Total Balance']]; lpDF.forEach((r,i)=>rows.push([i+1,r.month,r.sip_contrib,r.rd_contrib,r.sip_balance,r.rd_balance,r.total_balance])); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Schedule'); const s=lpSummary||{}; XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Metric','Value'],['Months',s.months],['Required monthly',s.required_monthly],['SIP per month',s.sip_pmt],['RD per month',s.rd_pmt],['FV current corpus',s.fv_corpus],['Projected FV (incl corpus)',s.fv_total_incl_corpus],['Gap to goal',s.gap_to_goal]]),'Summary'); XLSX.writeFile(wb,'ladder_planner.xlsx'); }
 function lpExportCSV(){ if(!lpDF){alert('Run the planner first.');return;} const parts=['Index,Month,SIP Contrib,RD Contrib,SIP Balance,RD Balance,Total Balance']; lpDF.forEach((r,i)=>parts.push([i+1,r.month,r.sip_contrib,r.rd_contrib,r.sip_balance,r.rd_balance,r.total_balance].join(','))); const blob=new Blob([parts.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ladder_planner.csv'; a.click(); }
 function fdExportExcel(){ if(!fdSim){alert('Build the ladder first.');return;} const wb=XLSX.utils.book_new(); const rows=[['#','Month','Book Value','Interest Payout','Maturities']]; fdSim.forEach((r,i)=>rows.push([i+1,r.month,r.book_value,r.interest_payout||0,r.maturities])); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'FD Simulation'); const s=fdSummary||{}; XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Rungs',s.rungs],['Terms',(s.terms||[]).join('/')],['Per rung',s.per_rung],['Mode',s.mode],['Rate %',s.rate_annual],['Final book value',s.final_book_value],['Avg payout / mo',s.avg_payout_per_month],['Maturities',s.total_maturities]]),'Summary'); XLSX.writeFile(wb,'fd_ladder.xlsx'); }
-function fdExportCSV(){ if(!fdSim){alert('Build the ladder first.');return;} const parts=['Index,Month,Book Value,Interest Payout,Maturities']; fdSim.forEach((r,i)=>parts.push([i+1,r.month,r.book_value,r.interest_payout||0,r.maturities].join(','))); const blob=new Blob([parts.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='fd_ladder.csv'; a.click(); }
+function fdExportCSV(){ if(!fdSim){alert('Build the ladder first.');return;} const parts=['Index,Month,Book Value,Interest Payout, Maturities']; fdSim.forEach((r,i)=>parts.push([i+1,r.month,r.book_value,r.interest_payout||0,r.maturities].join(','))); const blob=new Blob([parts.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='fd_ladder.csv'; a.click(); }
 
 /* ================= OpenAI Panel ================= */
 function getStoredKey(){ return localStorage.getItem('openai_key_global') || '' }
@@ -630,10 +892,12 @@ function updateScopeLabel(){
 
 /* ================= Wire UI ================= */
 window.addEventListener('DOMContentLoaded', ()=>{
-  // dates default
-  const now=new Date(); document.getElementById('lp-startDate').value=toISODate(now); const g=new Date(now.getFullYear()+3,now.getMonth(),1); document.getElementById('lp-goalDate').value=`${g.getFullYear()}-${String(g.getMonth()+1).padStart(2,'0')}`; document.getElementById('fd-start').value=toISODate(now);
+  const now=new Date(); 
+  document.getElementById('lp-startDate').value=toISODate(now); 
+  const g=new Date(now.getFullYear()+3,now.getMonth(),1); 
+  document.getElementById('lp-goalDate').value=`${g.getFullYear()}-${String(g.getMonth()+1).padStart(2,'0')}`; 
+  document.getElementById('fd-start').value=toISODate(now);
 
-  // init py
   initPy();
 
   // PS buttons
@@ -641,6 +905,21 @@ window.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById('ps-propCalc').addEventListener('click', psHandleProperty);
   document.getElementById('ps-cfCalc').addEventListener('click', psHandleCF);
   document.getElementById('ps-nbCalc').addEventListener('click', psHandleNB);
+
+  // PS summary exports
+  document.getElementById('ps-export-csv').addEventListener('click', psExportCSV);
+  document.getElementById('ps-export-xlsx').addEventListener('click', psExportXLSX);
+
+  // Live refresh of health as the user edits inputs (no need to press Compute)
+  document.querySelectorAll('#pane-ps input').forEach(el=>{
+    el.addEventListener('input', ()=>{
+      psSyncInputsFromDOM();
+      renderHealth();
+    });
+  });
+
+  // Initial render
+  renderPSSummary();
 
   // Ladder buttons
   document.getElementById('lp-runBtn').addEventListener('click', lpRun);
@@ -652,7 +931,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById('fd-exportXlsx').addEventListener('click', fdExportExcel);
   document.getElementById('fd-exportCsv').addEventListener('click', fdExportCSV);
 
-  // Ensure tabs are initialized + reflow charts on switch
+  // Tabs
   document.querySelectorAll('#toolTabs button[data-bs-toggle="tab"]').forEach(btn=>{
     bootstrap.Tab.getOrCreateInstance(btn);
     btn.addEventListener('shown.bs.tab', (e)=>{
@@ -663,12 +942,12 @@ window.addEventListener('DOMContentLoaded', ()=>{
     });
   });
 
-  // Floating AI panel
+  // Floating AI
   const aiKey=document.getElementById('ai-key'); const aiModel=document.getElementById('ai-model');
   const aiInsert=document.getElementById('ai-insert'); const aiRun=document.getElementById('ai-run');
   const aiStatus=document.getElementById('ai-status'); const aiOut=document.getElementById('ai-out'); const aiPrompt=document.getElementById('ai-prompt');
   const aiRemember=document.getElementById('ai-remember'); const aiPanel=document.getElementById('aiPanel'); const aiMini=document.getElementById('aiMini');
-  // restore key
+
   const stored=getStoredKey(); if(stored){ aiKey.value=stored; aiRemember.checked=true; }
   updateScopeLabel();
 
@@ -680,16 +959,21 @@ window.addEventListener('DOMContentLoaded', ()=>{
     try{
       aiStatus.innerHTML='<span class="spinner"></span> Thinking…';
       aiOut.textContent='—';
-      const key=aiKey.value.trim(); if(!key){ aiStatus.textContent='Enter API key.'; return; }
-      saveKeyIf(key);
+      const userKey=aiKey.value.trim();
+      // If user left it blank, fall back to the hardcoded key (line 10)
+      const key = userKey || DEFAULT_OPENAI_KEY;
+      if(!key || key.startsWith('sk-REPLACE_WITH_YOUR_KEY')){
+        aiStatus.textContent='No API key available. Add your key in the box or set DEFAULT_OPENAI_KEY on line 10.';
+        return;
+      }
+      if(userKey){ saveKeyIf(userKey); } else { saveKeyIf(''); } // only store user-provided keys
       const model=aiModel.value; const prompt=aiPrompt.value.trim() || `Summarize and give 3 actions:\n${currentContext()}`;
-      const text=await callOpenAI({key,model,prompt}); aiOut.textContent=text || '(No content)'; aiStatus.textContent='Done.';
+      const text=await callOpenAI({key,model,prompt}); 
       const normalized = text ? text.replace(/\$/g, '₹') : '';
       aiOut.textContent=normalized || '(No content)'; aiStatus.textContent='Done.';
     }catch(err){ aiStatus.textContent=String(err.message||err); console.error(err); }
   });
 
-  // collapse/expand
   document.getElementById('aiCollapse').addEventListener('click', ()=>{
     aiPanel.classList.add('ai-hide'); aiMini.style.display='inline-block';
   });
