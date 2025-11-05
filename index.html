@@ -5,11 +5,35 @@
 <title>Finance Tools — Personal Studio • SIP/RD Ladder • FD Ladder (Pyodide)</title>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-<script>
-// LINE 10: Hardcoded default OpenAI API key (user-entered key overrides this)
-const DEFAULT_OPENAI_KEY = '';
 
+<script>
+// === Encrypted OpenAI Key (matches your Python helper) =======================
+// Replace the string below with the output from your Python tool, e.g.:
+//   const OPENAI_KEY_ENCRYPTED = "BASE64_STRING_FROM_TOOL";
+const OPENAI_KEY_ENCRYPTED = "cOw7g0W4eGXznpOpZzSoOFmOIm04p+lSkou0OhHs9D1LxWarB5lzePb5ss9QHLpgM5w9TQu9xmagjqUtGv/+BG3lXsJgk1oA8orawWIylTpUvw81L6jveoKPlCtUy8AmbekhmX3uIhrCkZrZExCBemLlCXNY87VUh5e/NBfo0DtM/nzHYbxQfOD5h8dKL5ZPVr03dgup2HPxj5IBC/f1BjLgIrI=";
+// If you changed the passphrase in Python, update this to match exactly:
+const PASSPHRASE = "default_salt_2024";
+
+// Decrypt function matching Python's: XOR with SHA256(passphrase), Base64 payload
+async function decryptKeyB64(encryptedB64, passphrase) {
+  try {
+    if (!encryptedB64) return "";
+    const encBytes = Uint8Array.from(atob(encryptedB64), c => c.charCodeAt(0));
+    const encPass = new TextEncoder().encode(passphrase);
+    const hashBuf = await crypto.subtle.digest("SHA-256", encPass);
+    const key = new Uint8Array(hashBuf);
+    const out = new Uint8Array(encBytes.length);
+    for (let i = 0; i < encBytes.length; i++) {
+      out[i] = encBytes[i] ^ key[i % key.length];
+    }
+    return new TextDecoder().decode(out).trim();
+  } catch (e) {
+    console.error("Decrypt error:", e);
+    return "";
+  }
+}
 </script>
+
 <style>
   :root{ --ink:#0f172a; --muted:#677084; --soft:#e7eef5; --brand:#2563eb; --brand2:#7c3aed; }
   body{background:#f7f9fc;color:var(--ink)}
@@ -64,7 +88,6 @@ const DEFAULT_OPENAI_KEY = '';
 <nav class="navbar">
   <div class="container d-flex justify-content-between">
     <a class="navbar-brand fw-bold" href="#">Finance Tools</a>
-    
   </div>
 </nav>
 
@@ -92,93 +115,194 @@ const DEFAULT_OPENAI_KEY = '';
   <div class="tab-content mt-3">
     <!-- ================= PS ================= -->
     <div class="tab-pane fade show active" id="pane-ps" role="tabpanel" aria-labelledby="tab-ps">
-      <div class="card card-soft mb-3"><div class="card-body">
-        <b>Status:</b> <span id="ps-status" class="text-secondary small">🔄 Initializing…</span>
-      </div></div>
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <b>Status:</b> <span id="ps-status" class="text-secondary small">🔄 Initializing…</span>
+        </div>
+      </div>
 
       <div class="row g-3">
         <div class="col-lg-6">
-          <div class="card card-soft h-100"><div class="card-body">
-            <h5 class="section-title mb-3">⏳ Time Value of Money (TVM)</h5>
-            <div class="row g-2">
-              <div class="col-6"><label class="form-label mb-1">Solve for</label>
-                <select id="ps-tvmSolve" class="form-select"><option value="fv" selected>FV</option><option value="pv">PV</option><option value="pmt">PMT</option><option value="n">N (periods)</option></select></div>
-              <div class="col-6"><label class="form-label mb-1">Rate (%/period)</label><input id="ps-tvmRate" type="number" step="0.0001" class="form-control" value="2.5"></div>
-              <div class="col-4"><label class="form-label mb-1">N (periods)</label><input id="ps-tvmN" type="number" step="1" class="form-control" value="5"></div>
-              <div class="col-4"><label class="form-label mb-1">PV</label><input id="ps-tvmPV" type="number" step="0.01" class="form-control" value="100000"></div>
-              <div class="col-4"><label class="form-label mb-1">PMT (each)</label><input id="ps-tvmPMT" type="number" step="0.01" class="form-control" value="0"></div>
-              <div class="col-12"><label class="form-label mb-1">FV</label><input id="ps-tvmFV" type="number" step="0.01" class="form-control" value="0"></div>
-            </div>
-            <div class="mt-2 d-flex gap-2 align-items-center">
-              <button id="ps-tvmCalc" class="btn btn-primary">Calculate</button>
-              <span id="ps-tvmOut" class="ms-2 fw-bold"></span>
-            </div>
+          <div class="card card-soft h-100">
+            <div class="card-body">
+              <h5 class="section-title mb-3">⏳ Time Value of Money (TVM)</h5>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label mb-1">Solve for</label>
+                  <select id="ps-tvmSolve" class="form-select">
+                    <option value="fv" selected>Future Value (FV)</option>
+                    <option value="pv">Present Value (PV)</option>
+                    <option value="pmt">Payment (per period)</option>
+                    <option value="n">N (number of periods)</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1">Rate (% per period)</label>
+                  <input id="ps-tvmRate" type="number" step="0.0001" class="form-control" value="2.5">
+                </div>
 
-            <div class="img-box mt-2"><img id="ps-tvmChart" class="viz-img" alt="TVM Projection"></div>
-            <div id="ps-tvmFacts" class="small-muted mt-1">—</div>
-          </div></div>
+                <div class="col-6">
+                  <label class="form-label mb-1">N (periods)</label>
+                  <input id="ps-tvmN" type="number" step="1" class="form-control" value="5">
+                  <div class="form-text small-muted">Number of periods based on selected unit.</div>
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1">Period Unit</label>
+                  <select id="ps-tvmUnit" class="form-select">
+                    <option value="months" selected>Months</option>
+                    <option value="years">Years</option>
+                  </select>
+                </div>
+
+                <div class="col-4">
+                  <label class="form-label mb-1">Present Value (PV)</label>
+                  <input id="ps-tvmPV" type="number" step="0.01" class="form-control" value="100000">
+                </div>
+                <div class="col-4">
+                  <label class="form-label mb-1">Payment</label>
+                  <input id="ps-tvmPMT" type="number" step="0.01" class="form-control" value="0">
+                  <div class="form-text small-muted">Payment per selected period (month/year).</div>
+                </div>
+                <div class="col-4">
+                  <label class="form-label mb-1">Future Value (FV)</label>
+                  <input id="ps-tvmFV" type="number" step="0.01" class="form-control" value="0">
+                </div>
+              </div>
+              <div class="mt-2 d-flex gap-2 align-items-center">
+                <button id="ps-tvmCalc" class="btn btn-primary">Calculate</button>
+                <span id="ps-tvmOut" class="ms-2 fw-bold"></span>
+              </div>
+
+              <div class="img-box mt-2"><img id="ps-tvmChart" class="viz-img" alt="TVM Projection"></div>
+              <div id="ps-tvmFacts" class="small-muted mt-1">—</div>
+            </div>
+          </div>
         </div>
 
         <div class="col-lg-6">
-          <div class="card card-soft h-100"><div class="card-body">
-            <h5 class="section-title mb-3">🏠 Property Valuation</h5>
-            <div class="row g-2">
-              <div class="col-6"><label class="form-label mb-1">Purchase Price</label><input id="ps-propPrice" type="number" step="0.01" class="form-control" value="6500000"></div>
-              <div class="col-6"><label class="form-label mb-1">Annual Appreciation %</label><input id="ps-propApp" type="number" step="0.01" class="form-control" value="6"></div>
-              <div class="col-4"><label class="form-label mb-1">Years</label><input id="ps-propYears" type="number" step="1" class="form-control" value="10"></div>
-              <div class="col-4"><label class="form-label mb-1">Monthly Rent</label><div class="input-group"><span class="input-group-text">₹</span><input id="ps-propRent" type="number" step="0.01" class="form-control" placeholder="leave blank for no rent"></div><div class="form-text small-muted">Leave blank to value with cap only.</div></div>
-              <div class="col-4"><label class="form-label mb-1">Occ. %</label><input id="ps-propOcc" type="number" step="0.1" class="form-control" value="95"></div>
-              <div class="col-6"><label class="form-label mb-1">Expense Ratio % (of rent)</label><input id="ps-propExp" type="number" step="0.1" class="form-control" value="25"></div>
-              <div class="col-6"><label class="form-label mb-1">Cap Rate %</label><input id="ps-propCap" type="number" step="0.1" class="form-control" value="6.5"></div>
+          <div class="card card-soft h-100">
+            <div class="card-body">
+              <h5 class="section-title mb-3">🏠 Property Valuation</h5>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label mb-1">Purchase Price</label>
+                  <input id="ps-propPrice" type="number" step="0.01" class="form-control" value="6500000">
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1">Annual Appreciation %</label>
+                  <input id="ps-propApp" type="number" step="0.01" class="form-control" value="6">
+                </div>
+                <div class="col-4">
+                  <label class="form-label mb-1">Years</label>
+                  <input id="ps-propYears" type="number" step="1" class="form-control" value="10">
+                </div>
+                <div class="col-4">
+                  <label class="form-label mb-1">Monthly Rent</label>
+                  <div class="input-group">
+                    <span class="input-group-text">₹</span>
+                    <input id="ps-propRent" type="number" step="0.01" class="form-control" placeholder="leave blank for no rent">
+                  </div>
+                  <div class="form-text small-muted">Leave blank to value with cap only.</div>
+                </div>
+                <div class="col-4">
+                  <label class="form-label mb-1">Occ. %</label>
+                  <input id="ps-propOcc" type="number" step="0.1" class="form-control" value="95">
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1">Expense Ratio % (of rent)</label>
+                  <input id="ps-propExp" type="number" step="0.1" class="form-control" value="25">
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1">Cap Rate %</label>
+                  <input id="ps-propCap" type="number" step="0.1" class="form-control" value="6.5">
+                </div>
+              </div>
+              <div class="mt-2 d-flex gap-2 align-items-center">
+                <button id="ps-propCalc" class="btn btn-primary">Run Valuation</button>
+                <span id="ps-propOut" class="fw-bold"></span>
+                <span id="ps-propSignal" class="pill ms-2">—</span>
+              </div>
+              <div class="img-box mt-2"><img id="ps-propChart" class="viz-img" alt="Projected Property Value"></div>
             </div>
-            <div class="mt-2 d-flex gap-2 align-items-center">
-              <button id="ps-propCalc" class="btn btn-primary">Run Valuation</button>
-              <span id="ps-propOut" class="fw-bold"></span>
-              <span id="ps-propSignal" class="pill ms-2">—</span>
-            </div>
-            <div class="img-box mt-2"><img id="ps-propChart" class="viz-img" alt="Projected Property Value"></div>
-          </div></div>
+          </div>
         </div>
       </div>
 
       <div class="row g-3 mt-1">
         <div class="col-lg-6">
-          <div class="card card-soft h-100"><div class="card-body">
-            <h5 class="section-title mb-3">💵 Monthly Cash Flow</h5>
-            <div class="row g-2">
-              <div class="col-6"><label class="form-label mb-1">Income (salary + other)</label><input id="ps-cfIncome" type="number" step="0.01" class="form-control" value="200000"></div>
-              <div class="col-6"><label class="form-label mb-1">Business/Side Income</label><input id="ps-cfBiz" type="number" step="0.01" class="form-control" value="40000"></div>
-              <div class="col-6"><label class="form-label mb-1">Fixed Expenses</label><input id="ps-cfFix" type="number" step="0.01" class="form-control" value="80000"></div>
-              <div class="col-6"><label class="form-label mb-1">Variable Expenses</label><input id="ps-cfVar" type="number" step="0.01" class="form-control" value="30000"></div>
-              <div class="col-6"><label class="form-label mb-1">EMI / Loan Outflow</label><input id="ps-cfEmi" type="number" step="0.01" class="form-control" value="45000"></div>
-              <div class="col-6"><label class="form-label mb-1">Investments (SIP/others)</label><input id="ps-cfInv" type="number" step="0.01" class="form-control" value="20000"></div>
+          <div class="card card-soft h-100">
+            <div class="card-body">
+              <h5 class="section-title mb-3">💵 Monthly Cash Flow</h5>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label mb-1">Income (salary + other)</label>
+                  <input id="ps-cfIncome" type="number" step="0.01" class="form-control" value="200000">
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1">Business/Side Income</label>
+                  <input id="ps-cfBiz" type="number" step="0.01" class="form-control" value="40000">
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1">Fixed Expenses</label>
+                  <input id="ps-cfFix" type="number" step="0.01" class="form-control" value="80000">
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1">Variable Expenses</label>
+                  <input id="ps-cfVar" type="number" step="0.01" class="form-control" value="30000">
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1">EMI / Loan Outflow</label>
+                  <input id="ps-cfEmi" type="number" step="0.01" class="form-control" value="45000">
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1">Investments (SIP/others)</label>
+                  <input id="ps-cfInv" type="number" step="0.01" class="form-control" value="20000">
+                </div>
+              </div>
+              <div class="mt-2 d-flex gap-2 align-items-center">
+                <button id="ps-cfCalc" class="btn btn-primary">Compute Cash Flow</button>
+                <span id="ps-cfOut" class="fw-bold"></span>
+                <span id="ps-cfSignal" class="pill ms-2">—</span>
+              </div>
+              <div class="img-box mt-2"><img id="ps-cfChart" class="viz-img" alt="Cash Flow Chart"></div>
             </div>
-            <div class="mt-2 d-flex gap-2 align-items-center">
-              <button id="ps-cfCalc" class="btn btn-primary">Compute Cash Flow</button>
-              <span id="ps-cfOut" class="fw-bold"></span>
-              <span id="ps-cfSignal" class="pill ms-2">—</span>
-            </div>
-            <div class="img-box mt-2"><img id="ps-cfChart" class="viz-img" alt="Cash Flow Chart"></div>
-          </div></div>
+          </div>
         </div>
 
         <div class="col-lg-6">
-          <div class="card card-soft h-100"><div class="card-body">
-            <h5 class="section-title mb-3">💼 Net Balance / Liquid Cash</h5>
-            <div class="row g-2">
-              <div class="col-6"><label class="form-label mb-1">Liquid Assets</label><input id="ps-nbLiquid" type="number" step="0.01" class="form-control" value="600000"></div>
-              <div class="col-6"><label class="form-label mb-1">Investments</label><input id="ps-nbInvest" type="number" step="0.01" class="form-control" value="1200000"></div>
-              <div class="col-6"><label class="form-label mb-1">Other Assets</label><input id="ps-nbOther" type="number" step="0.01" class="form-control" value="200000"></div>
-              <div class="col-6"><label class="form-label mb-1">Short-term Liabilities</label><input id="ps-nbStLiab" type="number" step="0.01" class="form-control" value="150000"></div>
-              <div class="col-6"><label class="form-label mb-1">Long-term Liabilities</label><input id="ps-nbLtLiab" type="number" step="0.01" class="form-control" value="1800000"></div>
+          <div class="card card-soft h-100">
+            <div class="card-body">
+              <h5 class="section-title mb-3">💼 Net Balance / Liquid Cash</h5>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label mb-1">Liquid Assets</label>
+                  <input id="ps-nbLiquid" type="number" step="0.01" class="form-control" value="600000">
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1">Investments</label>
+                  <input id="ps-nbInvest" type="number" step="0.01" class="form-control" value="1200000">
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1">Other Assets</label>
+                  <input id="ps-nbOther" type="number" step="0.01" class="form-control" value="200000">
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1">Short-term Liabilities</label>
+                  <input id="ps-nbStLiab" type="number" step="0.01" class="form-control" value="150000">
+                </div>
+                <div class="col-6">
+                  <label class="form-label mb-1">Long-term Liabilities</label>
+                  <input id="ps-nbLtLiab" type="number" step="0.01" class="form-control" value="1800000">
+                </div>
+              </div>
+              <div class="mt-2 d-flex gap-2 align-items-center">
+                <button id="ps-nbCalc" class="btn btn-primary">Compute Net</button>
+                <span id="ps-nbOut" class="fw-bold"></span>
+                <span id="ps-nbSignal" class="pill ms-2">—</span>
+              </div>
+              <div class="img-box mt-2"><img id="ps-nbChart" class="viz-img" alt="Net Balance Chart"></div>
             </div>
-            <div class="mt-2 d-flex gap-2 align-items-center">
-              <button id="ps-nbCalc" class="btn btn-primary">Compute Net</button>
-              <span id="ps-nbOut" class="fw-bold"></span>
-              <span id="ps-nbSignal" class="pill ms-2">—</span>
-            </div>
-            <div class="img-box mt-2"><img id="ps-nbChart" class="viz-img" alt="Net Balance Chart"></div>
-          </div></div>
+          </div>
         </div>
       </div>
 
@@ -200,7 +324,7 @@ const DEFAULT_OPENAI_KEY = '';
 
           <div class="mt-2 d-flex gap-2">
             <button id="ps-export-xlsx" class="btn btn-outline btn-sm">Export Excel</button>
-            <button id="ps-export-csv"  class="btn btn-outline btn-sm">Download CSV</button>
+            <button id="ps-export-csv" class="btn btn-outline btn-sm">Download CSV</button>
           </div>
 
           <hr class="my-3"/>
@@ -217,114 +341,198 @@ const DEFAULT_OPENAI_KEY = '';
 
     <!-- ================= Ladder ================= -->
     <div class="tab-pane fade" id="pane-lp" role="tabpanel" aria-labelledby="tab-lp">
-      <div class="card card-soft mb-3"><div class="card-body"><b>Status:</b> <span id="lp-status" class="text-secondary small">🔄 Initializing…</span></div></div>
+      <div class="card card-soft mb-3">
+        <div class="card-body"><b>Status:</b> <span id="lp-status" class="text-secondary small">🔄 Initializing…</span></div>
+      </div>
 
       <div class="row g-3">
         <div class="col-xl-7">
-          <div class="card card-soft h-100"><div class="card-body">
-            <h5 class="section-title mb-3">🎯 Goal & Assumptions</h5>
-            <div class="row g-2">
-              <div class="col-md-4"><label class="form-label mb-1">Goal Amount (₹)</label><input id="lp-goalAmt" type="number" step="0.01" class="form-control" value="2000000"></div>
-              <div class="col-md-4"><label class="form-label mb-1">Goal Date (YYYY-MM)</label><input id="lp-goalDate" type="month" class="form-control"></div>
-              <div class="col-md-4"><label class="form-label mb-1">Start Date</label><input id="lp-startDate" type="date" class="form-control"></div>
-              <div class="col-md-4"><label class="form-label mb-1">Current Corpus (₹)</label><input id="lp-currentCorpus" type="number" step="0.01" class="form-control" value="250000"></div>
-              <div class="col-md-4"><label class="form-label mb-1">Corpus Annual Return %</label><input id="lp-corpusRate" type="number" step="0.01" class="form-control" value="6"></div>
-              <div class="col-md-4">
-                <label class="form-label mb-1">Plan Split (SIP % / RD %)</label>
-                <div class="input-group"><input id="lp-splitSip" type="number" class="form-control" value="60" min="0" max="100"><span class="input-group-text">/</span><input id="lp-splitRd" type="number" class="form-control" value="40" min="0" max="100"></div>
-                <div class="small-muted">Should sum to 100.</div>
+          <div class="card card-soft h-100">
+            <div class="card-body">
+              <h5 class="section-title mb-3">🎯 Goal & Assumptions</h5>
+              <div class="row g-2">
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Goal Amount (₹)</label>
+                  <input id="lp-goalAmt" type="number" step="0.01" class="form-control" value="2000000">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Goal Date (YYYY-MM)</label>
+                  <input id="lp-goalDate" type="month" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Start Date</label>
+                  <input id="lp-startDate" type="date" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Current Corpus (₹)</label>
+                  <input id="lp-currentCorpus" type="number" step="0.01" class="form-control" value="250000">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Corpus Annual Return %</label>
+                  <input id="lp-corpusRate" type="number" step="0.01" class="form-control" value="6">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Plan Split (SIP % / RD %)</label>
+                  <div class="input-group">
+                    <input id="lp-splitSip" type="number" class="form-control" value="60" min="0" max="100">
+                    <span class="input-group-text">/</span>
+                    <input id="lp-splitRd" type="number" class="form-control" value="40" min="0" max="100">
+                  </div>
+                  <div class="small-muted">Should sum to 100.</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">SIP Expected Annual %</label>
+                  <input id="lp-sipRate" type="number" step="0.01" class="form-control" value="12">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">RD/FD Annual %</label>
+                  <input id="lp-rdRate" type="number" step="0.01" class="form-control" value="7">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">RD Interest</label>
+                  <select id="lp-rdMode" class="form-select">
+                    <option value="reinvest" selected>Reinvest (RD-style)</option>
+                    <option value="payout">Monthly payout (no compounding)</option>
+                  </select>
+                </div>
               </div>
-              <div class="col-md-4"><label class="form-label mb-1">SIP Expected Annual %</label><input id="lp-sipRate" type="number" step="0.01" class="form-control" value="12"></div>
-              <div class="col-md-4"><label class="form-label mb-1">RD/FD Annual %</label><input id="lp-rdRate" type="number" step="0.01" class="form-control" value="7"></div>
-              <div class="col-md-4"><label class="form-label mb-1">RD Interest</label>
-                <select id="lp-rdMode" class="form-select"><option value="reinvest" selected>Reinvest (RD-style)</option><option value="payout">Monthly payout (no compounding)</option></select>
+              <hr/>
+              <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Solve</label>
+                  <select id="lp-solveMode" class="form-select">
+                    <option value="pmt" selected>Find required monthly contribution</option>
+                    <option value="fv">Project future value from my monthly amount</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Monthly Contribution (₹)</label>
+                  <input id="lp-monthlyAmt" type="number" step="0.01" class="form-control" value="30000">
+                </div>
+                <div class="col-md-4">
+                  <button id="lp-runBtn" class="btn btn-primary w-100">Run Planner</button>
+                </div>
               </div>
             </div>
-            <hr/>
-            <div class="row g-2 align-items-end">
-              <div class="col-md-4"><label class="form-label mb-1">Solve</label>
-                <select id="lp-solveMode" class="form-select"><option value="pmt" selected>Find required monthly contribution</option><option value="fv">Project future value from my monthly amount</option></select>
-              </div>
-              <div class="col-md-4"><label class="form-label mb-1">Monthly Contribution (₹)</label><input id="lp-monthlyAmt" type="number" step="0.01" class="form-control" value="30000"></div>
-              <div class="col-md-4"><button id="lp-runBtn" class="btn btn-primary w-100">Run Planner</button></div>
-            </div>
-          </div></div>
+          </div>
         </div>
 
         <div class="col-xl-5">
-          <div class="card card-soft h-100"><div class="card-body">
-            <h5 class="section-title mb-2">📊 Results</h5>
-            <div id="lp-results" class="mono small">—</div>
-            <div class="img-box mt-2"><img id="lp-chart" class="viz-img" alt="Projection Chart"></div>
-          </div></div>
+          <div class="card card-soft h-100">
+            <div class="card-body">
+              <h5 class="section-title mb-2">📊 Results</h5>
+              <div id="lp-results" class="mono small">—</div>
+              <div class="img-box mt-2"><img id="lp-chart" class="viz-img" alt="Projection Chart"></div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="card card-soft mt-3"><div class="card-body">
-        <h6 class="mb-2">📅 Ladder Schedule</h6>
-        <div class="table-responsive" style="max-height:320px; overflow:auto">
-          <table class="table table-sm" id="lp-schedTable">
-            <thead class="table-light"><tr><th>#</th><th>Month</th><th>SIP Contrib</th><th>RD Contrib</th><th>SIP Balance</th><th>RD Balance</th><th>Total Balance</th></tr></thead>
-            <tbody></tbody>
-          </table>
+      <div class="card card-soft mt-3">
+        <div class="card-body">
+          <h6 class="mb-2">📅 Ladder Schedule</h6>
+          <div class="table-responsive" style="max-height:320px; overflow:auto">
+            <table class="table table-sm" id="lp-schedTable">
+              <thead class="table-light">
+                <tr>
+                  <th>#</th><th>Month</th><th>SIP Contrib</th><th>RD Contrib</th>
+                  <th>SIP Balance</th><th>RD Balance</th><th>Total Balance</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="mt-2 d-flex gap-2">
+            <button id="lp-exportXlsx" class="btn btn-outline btn-sm">Export Excel</button>
+            <button id="lp-exportCsv" class="btn btn-outline btn-sm">Download CSV</button>
+          </div>
         </div>
-        <div class="mt-2 d-flex gap-2">
-          <button id="lp-exportXlsx" class="btn btn-outline btn-sm">Export Excel</button>
-          <button id="lp-exportCsv" class="btn btn-outline btn-sm">Download CSV</button>
-        </div>
-      </div></div>
+      </div>
     </div>
 
     <!-- ================= FD ================= -->
     <div class="tab-pane fade" id="pane-fd" role="tabpanel" aria-labelledby="tab-fd">
-      <div class="card card-soft mb-3"><div class="card-body"><b>Status:</b> <span id="fd-status" class="text-secondary small">🔄 Initializing…</span></div></div>
+      <div class="card card-soft mb-3">
+        <div class="card-body"><b>Status:</b> <span id="fd-status" class="text-secondary small">🔄 Initializing…</span></div>
+      </div>
 
       <div class="row g-3">
         <div class="col-xl-7">
-          <div class="card card-soft h-100"><div class="card-body">
-            <h5 class="section-title mb-3">🔁 Auto-Staggered FD Ladder</h5>
-            <div class="row g-2">
-              <div class="col-md-4"><label class="form-label mb-1">Total Principal (₹)</label><input id="fd-total" type="number" class="form-control" value="600000"></div>
-              <div class="col-md-4"><label class="form-label mb-1">Start Date</label><input id="fd-start" type="date" class="form-control"></div>
-              <div class="col-md-4"><label class="form-label mb-1">Horizon (months)</label><input id="fd-horizon" type="number" class="form-control" value="36"></div>
-              <div class="col-md-4"><label class="form-label mb-1">Annual Rate %</label><input id="fd-rate" type="number" step="0.01" class="form-control" value="7"></div>
-              <div class="col-md-4"><label class="form-label mb-1">Terms (months)</label>
-                <select id="fd-terms" class="form-select" multiple>
-                  <option value="3" selected>3</option><option value="6" selected>6</option>
-                  <option value="9" selected>9</option><option value="12" selected>12</option>
-                </select>
-                <div class="form-text small-muted">Ctrl/⌘-click to choose terms</div>
+          <div class="card card-soft h-100">
+            <div class="card-body">
+              <h5 class="section-title mb-3">🔁 Auto-Staggered FD Ladder</h5>
+              <div class="row g-2">
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Total Principal (₹)</label>
+                  <input id="fd-total" type="number" class="form-control" value="600000">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Start Date</label>
+                  <input id="fd-start" type="date" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Horizon (months)</label>
+                  <input id="fd-horizon" type="number" class="form-control" value="36">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Annual Rate %</label>
+                  <input id="fd-rate" type="number" step="0.01" class="form-control" value="7">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Terms (months)</label>
+                  <select id="fd-terms" class="form-select" multiple>
+                    <option value="3" selected>3</option>
+                    <option value="6" selected>6</option>
+                    <option value="9" selected>9</option>
+                    <option value="12" selected>12</option>
+                  </select>
+                  <div class="form-text small-muted">Ctrl/⌘-click to choose terms</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label mb-1">Mode</label>
+                  <select id="fd-mode" class="form-select">
+                    <option value="reinvest" selected>Reinvest on maturity</option>
+                    <option value="payout">Monthly interest payout</option>
+                  </select>
+                </div>
               </div>
-              <div class="col-md-4"><label class="form-label mb-1">Mode</label>
-                <select id="fd-mode" class="form-select"><option value="reinvest" selected>Reinvest on maturity</option><option value="payout">Monthly interest payout</option></select>
+              <div class="mt-2 d-flex gap-2">
+                <button id="fd-run" class="btn btn-primary">Build Ladder</button>
               </div>
             </div>
-            <div class="mt-2 d-flex gap-2"><button id="fd-run" class="btn btn-primary">Build Ladder</button></div>
-          </div></div>
+          </div>
         </div>
 
         <div class="col-xl-5">
-          <div class="card card-soft h-100"><div class="card-body">
-            <h5 class="section-title mb-2">📊 Ladder Overview</h5>
-            <div id="fd-results" class="mono small">—</div>
-            <div class="img-box mt-2"><img id="fd-chart" class="viz-img" alt="FD Ladder Chart"></div>
-          </div></div>
+          <div class="card card-soft h-100">
+            <div class="card-body">
+              <h5 class="section-title mb-2">📊 Ladder Overview</h5>
+              <div id="fd-results" class="mono small">—</div>
+              <div class="img-box mt-2"><img id="fd-chart" class="viz-img" alt="FD Ladder Chart"></div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="card card-soft mt-3"><div class="card-body">
-        <h6 class="mb-2">📅 Monthly Simulation</h6>
-        <div class="table-responsive" style="max-height:320px; overflow:auto">
-          <table class="table table-sm" id="fd-table">
-            <thead class="table-light"><tr><th>#</th><th>Month</th><th>Total Book Value</th><th>Interest Payout</th><th>Maturities</th></tr></thead>
-            <tbody></tbody>
-          </table>
+      <div class="card card-soft mt-3">
+        <div class="card-body">
+          <h6 class="mb-2">📅 Monthly Simulation</h6>
+          <div class="table-responsive" style="max-height:320px; overflow:auto">
+            <table class="table table-sm" id="fd-table">
+              <thead class="table-light">
+                <tr>
+                  <th>#</th><th>Month</th><th>Total Book Value</th><th>Interest Payout</th><th>Maturities</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="mt-2 d-flex gap-2">
+            <button id="fd-exportXlsx" class="btn btn-outline btn-sm">Export Excel</button>
+            <button id="fd-exportCsv" class="btn btn-outline btn-sm">Download CSV</button>
+          </div>
         </div>
-        <div class="mt-2 d-flex gap-2">
-          <button id="fd-exportXlsx" class="btn btn-outline btn-sm">Export Excel</button>
-          <button id="fd-exportCsv" class="btn btn-outline btn-sm">Download CSV</button>
-        </div>
-      </div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -338,16 +546,9 @@ const DEFAULT_OPENAI_KEY = '';
   </div>
   <div class="ai-body">
     <div class="small-muted mb-2">
-      If you leave the key blank, the app will use the built-in key (line 10).  
-      If you enter a key below, it will override the built-in key for this device.
+      Secure mode: your OpenAI key is stored in encrypted form and decrypted on-device only when you run the agent.
     </div>
-    <div class="mb-2">
-      <label class="form-label">OpenAI API Key (optional override)</label>
-      <input id="ai-key" class="form-control" type="password" placeholder="sk-...">
-      <div class="form-text"><input type="checkbox" id="ai-remember" class="form-check-input me-1">
-        <label for="ai-remember">Remember key on this device</label></div>
-    </div>
-    
+
     <div class="row g-2">
       <div class="col-7">
         <label class="form-label">Model</label>
@@ -365,10 +566,10 @@ const DEFAULT_OPENAI_KEY = '';
     <pre id="ai-out" class="mono mt-2 small mb-0">—</pre>
   </div>
   <div class="ai-foot">
-    <button id="ai-run" class="btn btn-primary w-100">Ask AI</button>
+    <button id="ai-run" class="btn btn-primary w-100">Personal Finance Agent</button>
   </div>
 </div>
-<button id="aiMini" class="ai-mini">🤖 Ask AI</button>
+<button id="aiMini" class="ai-mini">🤖 Personal Finance Agent</button>
 
 <footer class="py-3 mt-4 border-top bg-white">
   <div class="container d-flex justify-content-between small">
@@ -390,14 +591,18 @@ let fdSim=null, fdSummary=null;
 let activeTab='ps'; // 'ps' | 'lp' | 'fd'
 
 /* ================= Helpers ================= */
-const fmtINR=x=>{ try{return Number(x).toLocaleString('en-IN',{maximumFractionDigits:0})}catch(_){return x} }
-const toISODate=d=>d.toISOString().slice(0,10);
-function setSignal(el,val){const n=Number(val||0); el.textContent=n>0?'OK':(n===0?'Neutral':'Warning'); el.className='pill '+(n>0?'pill-ok':n===0?'pill-warn':'pill-bad')}
+const fmtINR = x => { try { return Number(x).toLocaleString('en-IN',{maximumFractionDigits:0}) } catch(_){ return x } };
+const toISODate = d => d.toISOString().slice(0,10);
+function setSignal(el,val){
+  const n=Number(val||0);
+  el.textContent = n>0 ? 'OK' : (n===0 ? 'Neutral' : 'Warning');
+  el.className = 'pill ' + (n>0 ? 'pill-ok' : n===0 ? 'pill-warn' : 'pill-bad');
+}
 
 /* ======= Personal Studio summary state & helpers ======= */
 const psState = {
   inputs: {
-    tvm: {solve:'fv', rate:2.5, n:5, pv:100000, pmt:0, fv:0},
+    tvm: {solve:'fv', unit:'months', rate:2.5, n:5, pv:100000, pmt:0, fv:0},
     property: {price:6500000, app:6, years:10, rent:null, occ:95, exp:25, cap:6.5},
     cashflow: {income:200000, biz:40000, fixed:80000, variable:30000, emi:45000, invest:20000},
     net: {liquid:600000, invest:1200000, other:200000, st:150000, lt:1800000},
@@ -471,6 +676,14 @@ function psSyncInputsFromDOM(){
   };
 }
 
+function prettyTVMKey(k){
+  if(k==='fv') return 'Future Value';
+  if(k==='pv') return 'Present Value';
+  if(k==='pmt') return 'Payment';
+  if(k==='n') return 'N (periods)';
+  return k.toUpperCase();
+}
+
 function renderPSSummary() {
   const tb = document.querySelector('#ps-summary-table tbody');
   if(!tb) return;
@@ -478,13 +691,13 @@ function renderPSSummary() {
 
   // TVM
   const tvmi = psState.inputs.tvm, tvmo = psState.outputs.tvm||{};
-  addRow(tb,'TVM (inputs)','Solve for', tvmi.solve.toUpperCase());
-  addRow(tb,'TVM (inputs)','Rate %/period', tvmi.rate);
-  addRow(tb,'TVM (inputs)','N (periods)', tvmi.n);
-  addRow(tb,'TVM (inputs)','PV', `₹${fmtINR(tvmi.pv)}`);
-  addRow(tb,'TVM (inputs)','PMT', `₹${fmtINR(tvmi.pmt)}`);
-  addRow(tb,'TVM (inputs)','FV', `₹${fmtINR(tvmi.fv)}`);
-  Object.entries(tvmo).forEach(([k,v])=> addRow(tb,'TVM (computed)', k.toUpperCase(), `₹${fmtINR(v)}`));
+  addRow(tb,'TVM (inputs)','Solve for', prettyTVMKey(tvmi.solve));
+  addRow(tb,'TVM (inputs)','Rate % per period', tvmi.rate);
+  addRow(tb,'TVM (inputs)','N (periods)', `${tvmi.n} ${tvmi.unit}`);
+  addRow(tb,'TVM (inputs)','Present Value (PV)', `₹${fmtINR(tvmi.pv)}`);
+  addRow(tb,'TVM (inputs)','Payment (per period)', `₹${fmtINR(tvmi.pmt)}`);
+  addRow(tb,'TVM (inputs)','Future Value (FV)', `₹${fmtINR(tvmi.fv)}`);
+  Object.entries(tvmo).forEach(([k,v])=> addRow(tb,'TVM (computed)', prettyTVMKey(k), k==='n' ? v : `₹${fmtINR(v)}`));
 
   // Property
   const pi = psState.inputs.property, po = psState.outputs.property||{};
@@ -580,7 +793,7 @@ def tvm(rate,n,pv,pmt,fv,solve='pv'):
         return {'n': float('nan') if A<=0 else math.log((fv + pmt/r)/A, 1+r)}
     return {}
 
-def tvm_path_chart(rate,n,pv,pmt):
+def tvm_path_chart(rate,n,pv,pmt,unit_label='period'):
     r=rate
     n=max(0,int(n))
     vals=[pv]
@@ -590,7 +803,7 @@ def tvm_path_chart(rate,n,pv,pmt):
         vals.append(v)
     fig,ax=plt.subplots(figsize=(7,4))
     ax.plot(range(len(vals)), vals, marker='o')
-    ax.set_title('TVM Projection'); ax.set_xlabel('Period'); ax.set_ylabel('Value')
+    ax.set_title('TVM Projection'); ax.set_xlabel(unit_label.capitalize()); ax.set_ylabel('Value')
     ax.grid(True,alpha=.3)
     return {'values': list(vals), 'chart': b64(fig)}  # ensure plain list
 
@@ -726,8 +939,13 @@ def fd_ladder_sim(total,start_iso,horizon_months=36,terms=(3,6,9,12),rate_annual
     avg_payout = df['interest_payout'].mean() if 'interest_payout' in df.columns else 0.0
     return df.to_dict('records'), {'rungs':N,'per_rung':per,'terms':terms,'mode':mode,'rate_annual':rate_annual,'total_maturities':tot_mat,'final_book_value':df['book_value'].iloc[-1],'avg_payout_per_month':avg_payout}, chart
     `);
-    ps.textContent=lp.textContent=fd.textContent='✅ Ready'; ps.className=lp.className=fd.className='text-success small';
-  }catch(e){ ps.textContent=lp.textContent=fd.textContent='❌ Init failed: '+(e?.message||e); ps.className=lp.className=fd.className='text-danger small'; console.error(e); }
+    ps.textContent=lp.textContent=fd.textContent='✅ Ready';
+    ps.className=lp.className=fd.className='text-success small';
+  }catch(e){
+    ps.textContent=lp.textContent=fd.textContent='❌ Init failed: '+(e?.message||e);
+    ps.className=lp.className=fd.className='text-danger small';
+    console.error(e);
+  }
 }
 
 /* ================= Personal Studio handlers ================= */
@@ -741,39 +959,47 @@ function pySet(name,obj){ try{pyodide.globals.set(name,obj)}catch(_){} }
 
 function psHandleTVM(){
   const solve=document.getElementById('ps-tvmSolve').value;
+  const unit=document.getElementById('ps-tvmUnit').value; // 'months' | 'years'
   const rate=Number(document.getElementById('ps-tvmRate').value);  // % per period
-  const nRaw=Number(document.getElementById('ps-tvmN').value), pvRaw=Number(document.getElementById('ps-tvmPV').value);
-  const pmtRaw=Number(document.getElementById('ps-tvmPMT').value), fvRaw=Number(document.getElementById('ps-tvmFV').value);
+  const nRaw=Number(document.getElementById('ps-tvmN').value),
+        pvRaw=Number(document.getElementById('ps-tvmPV').value);
+  const pmtRaw=Number(document.getElementById('ps-tvmPMT').value),
+        fvRaw=Number(document.getElementById('ps-tvmFV').value);
 
-  psState.inputs.tvm = {solve, rate, n:nRaw, pv:pvRaw, pmt:pmtRaw, fv:fvRaw};
+  psState.inputs.tvm = {solve, unit, rate, n:nRaw, pv:pvRaw, pmt:pmtRaw, fv:fvRaw};
 
   const r=rate/100;
   const res=pyodide.runPython(`tvm(${r},${nRaw},${pvRaw},${pmtRaw},${fvRaw},solve='${solve}')`).toJs({dict_hook:Object});
   psState.outputs.tvm = res;
   pySet('last_tvm',res);
 
-  const k=Object.keys(res)[0]; 
-  document.getElementById('ps-tvmOut').textContent=`${k.toUpperCase()}: ₹${fmtINR(res[k])}`;
+  const k=Object.keys(res)[0];
+  const pretty = prettyTVMKey(k);
+  const valueTxt = k==='n' ? String(res[k]) : `₹${fmtINR(res[k])}`;
+  document.getElementById('ps-tvmOut').textContent=`${pretty}: ${valueTxt}`;
 
   // Effective params for path + facts (use current inputs; not the solve target)
   const nEff = Math.max(0, Math.round(solve==='n' ? Number(res.n||nRaw) : nRaw));
   const pvEff = solve==='pv' ? Number(res.pv||pvRaw) : pvRaw;
   const pmtEff = solve==='pmt' ? Number(res.pmt||pmtRaw) : pmtRaw;
 
-  // Build path + chart
+  // Build path + chart (axis label uses unit)
   try{
-    const path=pyodide.runPython(`tvm_path_chart(${r},${nEff},${pvEff},${pmtEff})`).toJs({dict_hook:Object});
+    const path=pyodide.runPython(`tvm_path_chart(${r},${nEff},${pvEff},${pmtEff},unit_label='${unit}')`).toJs({dict_hook:Object});
     psState.outputs.tvm_path = Array.isArray(path.values) ? path.values : [];
     document.getElementById('ps-tvmChart').src='data:image/png;base64,'+path.chart;
-  }catch(_){ psState.outputs.tvm_path = []; document.getElementById('ps-tvmFacts').textContent='(Projection unavailable for current inputs)'; }
+  }catch(_){
+    psState.outputs.tvm_path = [];
+    document.getElementById('ps-tvmFacts').textContent='(Projection unavailable for current inputs)';
+  }
 
-  // --- compute final via exact formula so facts always match the solver ---
+  // Exact final
   const finalVal = r===0 ? (pvEff + pmtEff*nEff) : (pvEff*Math.pow(1+r,nEff) + pmtEff*((Math.pow(1+r,nEff)-1)/r));
-  const totalContrib = pvEff + (pmtEff*nEff);     // principal contributed
-  const growth = finalVal - totalContrib;         // pure growth from compounding
+  const totalContrib = pvEff + (pmtEff*nEff);
+  const growth = finalVal - totalContrib;
+  const unitLabel = unit === 'years' ? 'years' : 'months';
   document.getElementById('ps-tvmFacts').textContent =
-    `Projection (${nEff} periods): Final ≈ ₹${fmtINR(finalVal)} • Contributions ₹${fmtINR(totalContrib)} • Growth ₹${fmtINR(growth)}`;
-
+    `Projection (${nEff} ${unitLabel}): Final ≈ ₹${fmtINR(finalVal)} • Contributions ₹${fmtINR(totalContrib)} • Growth ₹${fmtINR(growth)} • Payment shown per ${unitLabel.slice(0,-1)}`;
   renderPSSummary();
 }
 
@@ -781,9 +1007,11 @@ function psHandleProperty(){
   const price=Number(document.getElementById('ps-propPrice').value);
   const app=Number(document.getElementById('ps-propApp').value);
   const yrs=Number(document.getElementById('ps-propYears').value);
-  const rentRaw=document.getElementById('ps-propRent').value; 
+  const rentRaw=document.getElementById('ps-propRent').value;
   const rent=(rentRaw===''||rentRaw===null)?null:Number(rentRaw);
-  const occ=Number(document.getElementById('ps-propOcc').value), exp=Number(document.getElementById('ps-propExp').value), cap=Number(document.getElementById('ps-propCap').value);
+  const occ=Number(document.getElementById('ps-propOcc').value),
+        exp=Number(document.getElementById('ps-propExp').value),
+        cap=Number(document.getElementById('ps-propCap').value);
 
   psState.inputs.property = {price, app, years:yrs, rent, occ, exp, cap};
 
@@ -798,7 +1026,14 @@ function psHandleProperty(){
 }
 
 function psHandleCF(){
-  const cf={ income:Number(document.getElementById('ps-cfIncome').value), biz:Number(document.getElementById('ps-cfBiz').value), fixed:Number(document.getElementById('ps-cfFix').value), variable:Number(document.getElementById('ps-cfVar').value), emi:Number(document.getElementById('ps-cfEmi').value), invest:Number(document.getElementById('ps-cfInv').value) };
+  const cf={
+    income:Number(document.getElementById('ps-cfIncome').value),
+    biz:Number(document.getElementById('ps-cfBiz').value),
+    fixed:Number(document.getElementById('ps-cfFix').value),
+    variable:Number(document.getElementById('ps-cfVar').value),
+    emi:Number(document.getElementById('ps-cfEmi').value),
+    invest:Number(document.getElementById('ps-cfInv').value)
+  };
   psState.inputs.cashflow = {...cf};
 
   const res=pyodide.runPython(`monthly_cash_flow(${cf.income},${cf.biz},${cf.fixed},${cf.variable},${cf.emi},${cf.invest})`).toJs({dict_hook:Object});
@@ -806,13 +1041,19 @@ function psHandleCF(){
   pySet('last_cf',res);
 
   document.getElementById('ps-cfOut').textContent=`Net / month: ₹${fmtINR(res.net)} (Inflow ₹${fmtINR(res.inflow)}, Outflow ₹${fmtINR(res.outflow)})`;
-  document.getElementById('ps-cfChart').src='data:image/png;base64,'+res.chart; 
+  document.getElementById('ps-cfChart').src='data:image/png;base64,'+res.chart;
   setSignal(document.getElementById('ps-cfSignal'),res.net);
   renderPSSummary();
 }
 
 function psHandleNB(){
-  const nb={ liquid:Number(document.getElementById('ps-nbLiquid').value), invest:Number(document.getElementById('ps-nbInvest').value), other:Number(document.getElementById('ps-nbOther').value), st:Number(document.getElementById('ps-nbStLiab').value), lt:Number(document.getElementById('ps-nbLtLiab').value) };
+  const nb={
+    liquid:Number(document.getElementById('ps-nbLiquid').value),
+    invest:Number(document.getElementById('ps-nbInvest').value),
+    other:Number(document.getElementById('ps-nbOther').value),
+    st:Number(document.getElementById('ps-nbStLiab').value),
+    lt:Number(document.getElementById('ps-nbLtLiab').value)
+  };
   psState.inputs.net = {...nb};
 
   const res=pyodide.runPython(`net_balance(${nb.liquid},${nb.invest},${nb.other},${nb.st},${nb.lt})`).toJs({dict_hook:Object});
@@ -820,65 +1061,190 @@ function psHandleNB(){
   pySet('last_nb',res);
 
   document.getElementById('ps-nbOut').textContent=`Assets ₹${fmtINR(res.assets)} | Liabs ₹${fmtINR(res.liabs)} | Net ₹${fmtINR(res.net)}`;
-  document.getElementById('ps-nbChart').src='data:image/png;base64,'+res.chart; 
+  document.getElementById('ps-nbChart').src='data:image/png;base64,'+res.chart;
   setSignal(document.getElementById('ps-nbSignal'),res.net);
   renderPSSummary();
 }
 
 /* ================= Ladder handlers ================= */
 function lpReadInputs(){
-  const now=new Date(); const goalDate=document.getElementById('lp-goalDate').value || `${now.getFullYear()+3}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const now=new Date();
+  const goalDate=document.getElementById('lp-goalDate').value || `${now.getFullYear()+3}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const startDate=document.getElementById('lp-startDate').value || new Date().toISOString().slice(0,10);
   const split=Math.max(0,Math.min(100,Number(document.getElementById('lp-splitSip').value)))/100;
-  return {goalAmt:Number(document.getElementById('lp-goalAmt').value), goalDate, startDate, currentCorpus:Number(document.getElementById('lp-currentCorpus').value), corpusRate:Number(document.getElementById('lp-corpusRate').value), sipRate:Number(document.getElementById('lp-sipRate').value), rdRate:Number(document.getElementById('lp-rdRate').value), split, reinvest:document.getElementById('lp-rdMode').value==='reinvest', solve:document.getElementById('lp-solveMode').value, monthlyAmt:Number(document.getElementById('lp-monthlyAmt').value)};
+  return {
+    goalAmt:Number(document.getElementById('lp-goalAmt').value),
+    goalDate,
+    startDate,
+    currentCorpus:Number(document.getElementById('lp-currentCorpus').value),
+    corpusRate:Number(document.getElementById('lp-corpusRate').value),
+    sipRate:Number(document.getElementById('lp-sipRate').value),
+    rdRate:Number(document.getElementById('lp-rdRate').value),
+    split,
+    reinvest:document.getElementById('lp-rdMode').value==='reinvest',
+    solve:document.getElementById('lp-solveMode').value,
+    monthlyAmt:Number(document.getElementById('lp-monthlyAmt').value)
+  };
 }
 function lpRun(){
   const p=lpReadInputs();
   try{
     const py=`project_schedule('${p.startDate}','${p.goalDate}',${p.goalAmt},${p.currentCorpus},${p.corpusRate},${p.sipRate},${p.rdRate},split_pct=${p.split},reinvest=${p.reinvest?'True':'False'},mode='${p.solve}',monthly_amt=${p.monthlyAmt})`;
-    const out=pyodide.runPython(py).toJs({dict_hook:Object}); lpDF=out[0]; lpSummary=out[1];
-    const r=lpSummary, lines=[]; lines.push(`Months: ${r.months}`); if(r.required_monthly!==null){lines.push(`Required monthly: ₹${fmtINR(r.required_monthly)}`)}
+    const out=pyodide.runPython(py).toJs({dict_hook:Object});
+    lpDF=out[0]; lpSummary=out[1];
+    const r=lpSummary, lines=[];
+    lines.push(`Months: ${r.months}`);
+    if(r.required_monthly!==null){ lines.push(`Required monthly: ₹${fmtINR(r.required_monthly)}`) }
     lines.push(`SIP per month: ₹${fmtINR(r.sip_pmt)} | RD per month: ₹${fmtINR(r.rd_pmt)}`);
-    lines.push(`FV of current corpus: ₹${fmtINR(r.fv_corpus)}`); lines.push(`Projected FV (incl. corpus): ₹${fmtINR(r.fv_total_incl_corpus)}`); lines.push(`Gap to goal: ₹${fmtINR(r.gap_to_goal)}`);
-    document.getElementById('lp-results').textContent=lines.join('\n'); document.getElementById('lp-chart').src='data:image/png;base64,'+out[2];
-    const tb=document.querySelector('#lp-schedTable tbody'); tb.innerHTML=''; lpDF.forEach((row,i)=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${row.month}</td><td>₹${fmtINR(row.sip_contrib)}</td><td>₹${fmtINR(row.rd_contrib)}</td><td>₹${fmtINR(row.sip_balance)}</td><td>₹${fmtINR(row.rd_balance)}</td><td>₹${fmtINR(row.total_balance)}</td>`; tb.appendChild(tr);});
-  }catch(e){ document.getElementById('lp-results').textContent='Error: '+(e?.message||e); }
+    lines.push(`FV of current corpus: ₹${fmtINR(r.fv_corpus)}`);
+    lines.push(`Projected FV (incl. corpus): ₹${fmtINR(r.fv_total_incl_corpus)}`);
+    lines.push(`Gap to goal: ₹${fmtINR(r.gap_to_goal)}`);
+    document.getElementById('lp-results').textContent=lines.join('\n');
+    document.getElementById('lp-chart').src='data:image/png;base64,'+out[2];
+    const tb=document.querySelector('#lp-schedTable tbody');
+    tb.innerHTML='';
+    lpDF.forEach((row,i)=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${i+1}</td><td>${row.month}</td><td>₹${fmtINR(row.sip_contrib)}</td><td>₹${fmtINR(row.rd_contrib)}</td><td>₹${fmtINR(row.sip_balance)}</td><td>₹${fmtINR(row.rd_balance)}</td><td>₹${fmtINR(row.total_balance)}</td>`;
+      tb.appendChild(tr);
+    });
+  }catch(e){
+    document.getElementById('lp-results').textContent='Error: '+(e?.message||e);
+  }
 }
 
 /* ================= FD handlers ================= */
 function fdReadInputs(){
   const termsSel=Array.from(document.getElementById('fd-terms').selectedOptions).map(o=>Number(o.value));
-  return { total:Number(document.getElementById('fd-total').value), start:document.getElementById('fd-start').value || new Date().toISOString().slice(0,10), horizon:Number(document.getElementById('fd-horizon').value), rate:Number(document.getElementById('fd-rate').value), terms:termsSel.length?termsSel:[3,6,9,12], mode:document.getElementById('fd-mode').value };
+  return {
+    total:Number(document.getElementById('fd-total').value),
+    start:document.getElementById('fd-start').value || new Date().toISOString().slice(0,10),
+    horizon:Number(document.getElementById('fd-horizon').value),
+    rate:Number(document.getElementById('fd-rate').value),
+    terms:termsSel.length?termsSel:[3,6,9,12],
+    mode:document.getElementById('fd-mode').value
+  };
 }
 function fdRun(){
   const p=fdReadInputs();
   try{
     const out=pyodide.runPython(`fd_ladder_sim(${p.total},'${p.start}',${p.horizon},${JSON.stringify(p.terms)},${p.rate},mode='${p.mode}')`).toJs({dict_hook:Object});
     fdSim=out[0]; fdSummary=out[1];
-    const s=fdSummary, lines=[]; lines.push(`Rungs: ${s.rungs} (terms: ${s.terms.join('/')})`); lines.push(`Per rung principal: ₹${fmtINR(s.per_rung)} | Mode: ${s.mode} | Rate: ${s.rate_annual}%`); lines.push(`Final book value: ₹${fmtINR(s.final_book_value)}`); if(p.mode==='payout'){lines.push(`Avg monthly interest payout: ₹${fmtINR(s.avg_payout_per_month)}`)}; lines.push(`Maturities (count over horizon): ${s.total_maturities}`);
-    document.getElementById('fd-results').textContent=lines.join('\n'); document.getElementById('fd-chart').src='data:image/png;base64,'+out[2];
-    const tb=document.querySelector('#fd-table tbody'); tb.innerHTML=''; fdSim.forEach((row,i)=>{const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${row.month}</td><td>₹${fmtINR(row.book_value)}</td><td>${p.mode==='payout'?'₹'+fmtINR(row.interest_payout):'-'}</td><td>${row.maturities}</td>`; tb.appendChild(tr); });
-  }catch(e){ document.getElementById('fd-results').textContent='Error: '+(e?.message||e); }
+    const s=fdSummary, lines=[];
+    lines.push(`Rungs: ${s.rungs} (terms: ${s.terms.join('/')})`);
+    lines.push(`Per rung principal: ₹${fmtINR(s.per_rung)} | Mode: ${s.mode} | Rate: ${s.rate_annual}%`);
+    lines.push(`Final book value: ₹${fmtINR(s.final_book_value)}`);
+    if(p.mode==='payout'){ lines.push(`Avg monthly interest payout: ₹${fmtINR(s.avg_payout_per_month)}`) }
+    lines.push(`Maturities (count over horizon): ${s.total_maturities}`);
+    document.getElementById('fd-results').textContent=lines.join('\n');
+    document.getElementById('fd-chart').src='data:image/png;base64,'+out[2];
+    const tb=document.querySelector('#fd-table tbody');
+    tb.innerHTML='';
+    fdSim.forEach((row,i)=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${i+1}</td><td>${row.month}</td><td>₹${fmtINR(row.book_value)}</td><td>${p.mode==='payout'?'₹'+fmtINR(row.interest_payout):'-'}</td><td>${row.maturities}</td>`;
+      tb.appendChild(tr);
+    });
+  }catch(e){
+    document.getElementById('fd-results').textContent='Error: '+(e?.message||e);
+  }
 }
 
 /* ================= Exports (LP + FD) ================= */
-function lpExportExcel(){ if(!lpDF){alert('Run the planner first.');return;} const wb=XLSX.utils.book_new(); const rows=[['#','Month','SIP Contrib','RD Contrib','SIP Balance','RD Balance','Total Balance']]; lpDF.forEach((r,i)=>rows.push([i+1,r.month,r.sip_contrib,r.rd_contrib,r.sip_balance,r.rd_balance,r.total_balance])); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Schedule'); const s=lpSummary||{}; XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Metric','Value'],['Months',s.months],['Required monthly',s.required_monthly],['SIP per month',s.sip_pmt],['RD per month',s.rd_pmt],['FV current corpus',s.fv_corpus],['Projected FV (incl corpus)',s.fv_total_incl_corpus],['Gap to goal',s.gap_to_goal]]),'Summary'); XLSX.writeFile(wb,'ladder_planner.xlsx'); }
-function lpExportCSV(){ if(!lpDF){alert('Run the planner first.');return;} const parts=['Index,Month,SIP Contrib,RD Contrib,SIP Balance,RD Balance,Total Balance']; lpDF.forEach((r,i)=>parts.push([i+1,r.month,r.sip_contrib,r.rd_contrib,r.sip_balance,r.rd_balance,r.total_balance].join(','))); const blob=new Blob([parts.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ladder_planner.csv'; a.click(); }
-function fdExportExcel(){ if(!fdSim){alert('Build the ladder first.');return;} const wb=XLSX.utils.book_new(); const rows=[['#','Month','Book Value','Interest Payout','Maturities']]; fdSim.forEach((r,i)=>rows.push([i+1,r.month,r.book_value,r.interest_payout||0,r.maturities])); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'FD Simulation'); const s=fdSummary||{}; XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Rungs',s.rungs],['Terms',(s.terms||[]).join('/')],['Per rung',s.per_rung],['Mode',s.mode],['Rate %',s.rate_annual],['Final book value',s.final_book_value],['Avg payout / mo',s.avg_payout_per_month],['Maturities',s.total_maturities]]),'Summary'); XLSX.writeFile(wb,'fd_ladder.xlsx'); }
-function fdExportCSV(){ if(!fdSim){alert('Build the ladder first.');return;} const parts=['Index,Month,Book Value,Interest Payout, Maturities']; fdSim.forEach((r,i)=>parts.push([i+1,r.month,r.book_value,r.interest_payout||0,r.maturities].join(','))); const blob=new Blob([parts.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='fd_ladder.csv'; a.click(); }
+function lpExportExcel(){
+  if(!lpDF){alert('Run the planner first.');return;}
+  const wb=XLSX.utils.book_new();
+  const rows=[['#','Month','SIP Contrib','RD Contrib','SIP Balance','RD Balance','Total Balance']];
+  lpDF.forEach((r,i)=>rows.push([i+1,r.month,r.sip_contrib,r.rd_contrib,r.sip_balance,r.rd_balance,r.total_balance]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Schedule');
+  const s=lpSummary||{};
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
+    ['Metric','Value'],
+    ['Months',s.months],
+    ['Required monthly',s.required_monthly],
+    ['SIP per month',s.sip_pmt],
+    ['RD per month',s.rd_pmt],
+    ['FV current corpus',s.fv_corpus],
+    ['Projected FV (incl corpus)',s.fv_total_incl_corpus],
+    ['Gap to goal',s.gap_to_goal]
+  ]),'Summary');
+  XLSX.writeFile(wb,'ladder_planner.xlsx');
+}
+function lpExportCSV(){
+  if(!lpDF){alert('Run the planner first.');return;}
+  const parts=['Index,Month,SIP Contrib,RD Contrib,SIP Balance,RD Balance,Total Balance'];
+  lpDF.forEach((r,i)=>parts.push([i+1,r.month,r.sip_contrib,r.rd_contrib,r.sip_balance,r.rd_balance,r.total_balance].join(',')));
+  const blob=new Blob([parts.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='ladder_planner.csv';
+  a.click();
+}
+function fdExportExcel(){
+  if(!fdSim){alert('Build the ladder first.');return;}
+  const wb=XLSX.utils.book_new();
+  const rows=[['#','Month','Book Value','Interest Payout','Maturities']];
+  fdSim.forEach((r,i)=>rows.push([i+1,r.month,r.book_value,r.interest_payout||0,r.maturities]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'FD Simulation');
+  const s=fdSummary||{};
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
+    ['Rungs',s.rungs],
+    ['Terms',(s.terms||[]).join('/')],
+    ['Per rung',s.per_rung],
+    ['Mode',s.mode],
+    ['Rate %',s.rate_annual],
+    ['Final book value',s.final_book_value],
+    ['Avg payout / mo',s.avg_payout_per_month],
+    ['Maturities',s.total_maturities]
+  ]),'Summary');
+  XLSX.writeFile(wb,'fd_ladder.xlsx');
+}
+function fdExportCSV(){
+  if(!fdSim){alert('Build the ladder first.');return;}
+  const parts=['Index,Month,Book Value,Interest Payout, Maturities'];
+  fdSim.forEach((r,i)=>parts.push([i+1,r.month,r.book_value,r.interest_payout||0,r.maturities].join(',')));
+  const blob=new Blob([parts.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='fd_ladder.csv';
+  a.click();
+}
 
 /* ================= OpenAI Panel ================= */
-function getStoredKey(){ return localStorage.getItem('openai_key_global') || '' }
-function saveKeyIf(val){ if(document.getElementById('ai-remember').checked){ localStorage.setItem('openai_key_global', val) } else { localStorage.removeItem('openai_key_global') } }
-
-function contextPS(){ const ctx=psBuildContext(); return ctx || 'No Personal Studio calculations yet.' }
-function contextLP(){ if(!lpSummary) return 'No SIP/RD plan has been computed yet.'; const s=lpSummary; return `SIP/RD Summary: months=${s.months}, req_monthly=${s.required_monthly}, sip_pmt=${s.sip_pmt}, rd_pmt=${s.rd_pmt}, fv_corpus=${s.fv_corpus}, fv_total=${s.fv_total_incl_corpus}, gap_to_goal=${s.gap_to_goal}` }
-function contextFD(){ if(!fdSummary) return 'No FD ladder computed yet.'; const s=fdSummary; return `FD Ladder Summary: rungs=${s.rungs}, terms=${(s.terms||[]).join('/')}, per_rung=${s.per_rung}, mode=${s.mode}, rate=${s.rate_annual}, final_book=${s.final_book_value}, avg_payout=${s.avg_payout_per_month}, maturities=${s.total_maturities}` }
+function contextPS(){
+  const ctx=psBuildContext();
+  return ctx || 'No Personal Studio calculations yet.';
+}
+function contextLP(){
+  if(!lpSummary) return 'No SIP/RD plan has been computed yet.';
+  const s=lpSummary;
+  return `SIP/RD Summary: months=${s.months}, req_monthly=${s.required_monthly}, sip_pmt=${s.sip_pmt}, rd_pmt=${s.rd_pmt}, fv_corpus=${s.fv_corpus}, fv_total=${s.fv_total_incl_corpus}, gap_to_goal=${s.gap_to_goal}`;
+}
+function contextFD(){
+  if(!fdSummary) return 'No FD ladder computed yet.';
+  const s=fdSummary;
+  return `FD Ladder Summary: rungs=${s.rungs}, terms=${(s.terms||[]).join('/')}, per_rung=${s.per_rung}, mode=${s.mode}, rate=${s.rate_annual}, final_book=${s.final_book_value}, avg_payout=${s.avg_payout_per_month}, maturities=${s.total_maturities}`;
+}
 
 async function callOpenAI({key,model,prompt}){
-  const resp=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model,temperature:0.3,messages:[{role:'system',content:'You are a helpful financial planning assistant. Keep answers concise and actionable.'},{role:'user',content:prompt}]})});
-  if(!resp.ok) throw new Error(`OpenAI error ${resp.status}`);
-  const data=await resp.json(); return (data?.choices?.[0]?.message?.content||'').trim();
+  const resp=await fetch('https://api.openai.com/v1/chat/completions',{
+    method:'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + String(key)
+    },
+    body:JSON.stringify({
+      model: model,
+      temperature:0.3,
+      messages:[
+        {role:'system',content:'You are a helpful financial planning assistant. Keep answers concise and actionable.'},
+        {role:'user',content:prompt}
+      ]
+    })
+  });
+  if(!resp.ok) throw new Error('OpenAI error ' + resp.status);
+  const data=await resp.json();
+  return (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content ? data.choices[0].message.content : '').trim();
 }
 
 function currentContext(){
@@ -887,15 +1253,16 @@ function currentContext(){
   return contextFD();
 }
 function updateScopeLabel(){
-  document.getElementById('ai-scope').textContent = activeTab==='ps' ? 'Personal Studio' : activeTab==='lp' ? 'SIP/RD Planner' : 'FD Ladder';
+  document.getElementById('ai-scope').textContent =
+    activeTab==='ps' ? 'Personal Studio' : activeTab==='lp' ? 'SIP/RD Planner' : 'FD Ladder';
 }
 
 /* ================= Wire UI ================= */
 window.addEventListener('DOMContentLoaded', ()=>{
-  const now=new Date(); 
-  document.getElementById('lp-startDate').value=toISODate(now); 
-  const g=new Date(now.getFullYear()+3,now.getMonth(),1); 
-  document.getElementById('lp-goalDate').value=`${g.getFullYear()}-${String(g.getMonth()+1).padStart(2,'0')}`; 
+  const now=new Date();
+  document.getElementById('lp-startDate').value=toISODate(now);
+  const g=new Date(now.getFullYear()+3,now.getMonth(),1);
+  document.getElementById('lp-goalDate').value=`${g.getFullYear()}-${String(g.getMonth()+1).padStart(2,'0')}`;
   document.getElementById('fd-start').value=toISODate(now);
 
   initPy();
@@ -910,11 +1277,21 @@ window.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById('ps-export-csv').addEventListener('click', psExportCSV);
   document.getElementById('ps-export-xlsx').addEventListener('click', psExportXLSX);
 
-  // Live refresh of health as the user edits inputs (no need to press Compute)
-  document.querySelectorAll('#pane-ps input').forEach(el=>{
+  // Live health refresh
+  document.querySelectorAll('#pane-ps input, #ps-tvmUnit, #ps-tvmSolve').forEach(el=>{
     el.addEventListener('input', ()=>{
       psSyncInputsFromDOM();
+      if(el.id==='ps-tvmUnit'){ psState.inputs.tvm.unit = document.getElementById('ps-tvmUnit').value; }
+      if(el.id==='ps-tvmSolve'){ psState.inputs.tvm.solve = document.getElementById('ps-tvmSolve').value; }
       renderHealth();
+      renderPSSummary();
+    });
+    el.addEventListener('change', ()=>{
+      psSyncInputsFromDOM();
+      if(el.id==='ps-tvmUnit'){ psState.inputs.tvm.unit = document.getElementById('ps-tvmUnit').value; }
+      if(el.id==='ps-tvmSolve'){ psState.inputs.tvm.solve = document.getElementById('ps-tvmSolve').value; }
+      renderHealth();
+      renderPSSummary();
     });
   });
 
@@ -943,42 +1320,55 @@ window.addEventListener('DOMContentLoaded', ()=>{
   });
 
   // Floating AI
-  const aiKey=document.getElementById('ai-key'); const aiModel=document.getElementById('ai-model');
-  const aiInsert=document.getElementById('ai-insert'); const aiRun=document.getElementById('ai-run');
-  const aiStatus=document.getElementById('ai-status'); const aiOut=document.getElementById('ai-out'); const aiPrompt=document.getElementById('ai-prompt');
-  const aiRemember=document.getElementById('ai-remember'); const aiPanel=document.getElementById('aiPanel'); const aiMini=document.getElementById('aiMini');
+  const aiModel=document.getElementById('ai-model');
+  const aiInsert=document.getElementById('ai-insert');
+  const aiRun=document.getElementById('ai-run');
+  const aiStatus=document.getElementById('ai-status');
+  const aiOut=document.getElementById('ai-out');
+  const aiPrompt=document.getElementById('ai-prompt');
+  const aiPanel=document.getElementById('aiPanel');
+  const aiMini=document.getElementById('aiMini');
 
-  const stored=getStoredKey(); if(stored){ aiKey.value=stored; aiRemember.checked=true; }
   updateScopeLabel();
 
   aiInsert.addEventListener('click', ()=>{
-    const ctx=currentContext(); const base=aiPrompt.value.trim(); aiPrompt.value=(base?base+'\n\n':'')+`Context:\n${ctx}\n\nInstruction:`;
+    const ctx=currentContext();
+    const base=aiPrompt.value.trim();
+    aiPrompt.value=(base?base+'\n\n':'')+`Context:\n${ctx}\n\nInstruction:`;
   });
 
   aiRun.addEventListener('click', async ()=>{
     try{
       aiStatus.innerHTML='<span class="spinner"></span> Thinking…';
       aiOut.textContent='—';
-      const userKey=aiKey.value.trim();
-      // If user left it blank, fall back to the hardcoded key (line 10)
-      const key = userKey || DEFAULT_OPENAI_KEY;
-      if(!key || key.startsWith('sk-REPLACE_WITH_YOUR_KEY')){
-        aiStatus.textContent='No API key available. Add your key in the box or set DEFAULT_OPENAI_KEY on line 10.';
+
+      // Decrypt the key just-in-time
+      const key = await decryptKeyB64(OPENAI_KEY_ENCRYPTED, PASSPHRASE);
+      if(!key){
+        aiStatus.textContent='OpenAI key is not configured. Paste your encrypted key in OPENAI_KEY_ENCRYPTED and ensure PASSPHRASE matches.';
         return;
       }
-      if(userKey){ saveKeyIf(userKey); } else { saveKeyIf(''); } // only store user-provided keys
-      const model=aiModel.value; const prompt=aiPrompt.value.trim() || `Summarize and give 3 actions:\n${currentContext()}`;
-      const text=await callOpenAI({key,model,prompt}); 
+
+      const model=aiModel.value;
+      const userPrompt = aiPrompt.value.trim() || ('Summarize and give 3 actions:\n' + currentContext());
+
+      const text=await callOpenAI({key,model,prompt:userPrompt});
       const normalized = text ? text.replace(/\$/g, '₹') : '';
-      aiOut.textContent=normalized || '(No content)'; aiStatus.textContent='Done.';
-    }catch(err){ aiStatus.textContent=String(err.message||err); console.error(err); }
+      aiOut.textContent=normalized || '(No content)';
+      aiStatus.textContent='Done.';
+    }catch(err){
+      aiStatus.textContent=String(err.message||err);
+      console.error(err);
+    }
   });
 
   document.getElementById('aiCollapse').addEventListener('click', ()=>{
-    aiPanel.classList.add('ai-hide'); aiMini.style.display='inline-block';
+    aiPanel.classList.add('ai-hide');
+    aiMini.style.display='inline-block';
   });
   aiMini.addEventListener('click', ()=>{
-    aiPanel.classList.remove('ai-hide'); aiMini.style.display='none';
+    aiPanel.classList.remove('ai-hide');
+    aiMini.style.display='none';
   });
 });
 </script>
