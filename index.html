@@ -23,9 +23,7 @@ async function decryptKeyB64(encryptedB64, passphrase) {
     const hashBuf = await crypto.subtle.digest("SHA-256", encPass);
     const key = new Uint8Array(hashBuf);
     const out = new Uint8Array(encBytes.length);
-    for (let i = 0; i < encBytes.length; i++) {
-      out[i] = encBytes[i] ^ key[i % key.length];
-    }
+    for (let i = 0; i < encBytes.length; i++) out[i] = encBytes[i] ^ key[i % key.length];
     return new TextDecoder().decode(out).trim();
   } catch (e) {
     console.error("Decrypt error:", e);
@@ -66,21 +64,40 @@ async function decryptKeyB64(encryptedB64, passphrase) {
   .nav-tabs .nav-link:hover{opacity:1;background:#f1f5ff}
   .nav-tabs .nav-link.active{background:#fff;box-shadow:0 6px 16px rgba(16,24,40,.08);outline:2px solid #e5ebff;opacity:1}
 
+  /* ==== ChatGPT-style floating AI panel ==== */
   .ai-panel{
-    position:fixed; right:18px; top:110px; width:360px; max-height:calc(100vh - 140px);
-    background:#fff; border:1px solid var(--soft); border-radius:16px; box-shadow:0 16px 40px rgba(16,24,40,.14);
+    position:fixed; right:18px; top:90px; width:420px; max-height:calc(100vh - 120px);
+    background:#fff; border:1px solid var(--soft); border-radius:18px; box-shadow:0 20px 44px rgba(16,24,40,.16);
     display:flex; flex-direction:column; overflow:hidden; z-index:20;
   }
-  .ai-panel .ai-head{padding:10px 12px;border-bottom:1px solid var(--soft);display:flex;align-items:center;gap:8px}
-  .ai-dot{width:8px;height:8px;border-radius:999px;background:#22c55e}
-  .ai-title{font-weight:700}
-  .ai-body{padding:12px;overflow:auto}
-  .ai-foot{padding:10px 12px;border-top:1px solid var(--soft);display:flex;gap:8px}
-  .ai-mini{position:fixed;right:18px;top:110px;background:#fff;border:1px solid var(--soft);border-radius:999px;padding:8px 10px;box-shadow:0 12px 28px rgba(16,24,40,.12);z-index:20;display:none}
-  .ai-hide{display:none}
-  @media (max-width:1200px){ .ai-panel{width:320px} }
+  /* Hidden state for minimize */
+  .ai-hidden{ display:none !important; }
+
+  .ai-head{padding:10px 12px;border-bottom:1px solid var(--soft);display:flex;align-items:center;gap:8px}
+  .ai-title{font-weight:800}
+  .ai-body{display:flex;flex-direction:column;gap:8px;padding:10px 12px;overflow:hidden}
+  .ai-chat{flex:1 1 auto;overflow:auto;padding:6px;border:1px solid var(--soft);border-radius:12px;background:#fbfcff}
+  .msg{max-width:85%;padding:.55rem .75rem;border-radius:14px;margin:.25rem 0;white-space:pre-wrap;word-wrap:break-word}
+  .me{margin-left:auto;background:#e9f0ff;border:1px solid #dbe5ff}
+  .ai{margin-right:auto;background:#f6f7fb;border:1px solid #eceff7}
+  .sys{margin:6px auto;color:#6b7280;font-size:.85rem}
+  .ai-foot{padding:10px 12px;border-top:1px solid var(--soft);display:flex;gap:8px;flex-wrap:wrap}
+  .ai-row{display:flex;gap:8px;align-items:flex-start}
+  .ai-row textarea{flex:1 1 auto;min-height:70px;max-height:160px}
+  .tight{display:flex;gap:8px;flex-wrap:wrap}
+  .ai-mini{
+    position:fixed;right:18px;top:90px;background:#fff;border:1px solid var(--soft);
+    border-radius:999px;padding:8px 10px;box-shadow:0 12px 28px rgba(16,24,40,.12);
+    z-index:20;display:none
+  }
+
+  @media (max-width:1200px){ .ai-panel{width:380px} }
   @media (max-width:992px){
-    .ai-panel{position:fixed;left:12px;right:12px;width:auto;top:auto;bottom:12px;max-height:72vh}
+    .ai-panel{left:12px;right:12px;width:auto;top:auto;bottom:12px;max-height:78vh}
+  }
+  @media (max-width:576px){
+    .ai-panel{left:8px;right:8px;bottom:8px}
+    .msg{max-width:92%}
   }
 </style>
 </head>
@@ -274,26 +291,11 @@ async function decryptKeyB64(encryptedB64, passphrase) {
             <div class="card-body">
               <h5 class="section-title mb-3">💼 Net Balance / Liquid Cash</h5>
               <div class="row g-2">
-                <div class="col-6">
-                  <label class="form-label mb-1">Liquid Assets</label>
-                  <input id="ps-nbLiquid" type="number" step="0.01" class="form-control" value="600000">
-                </div>
-                <div class="col-6">
-                  <label class="form-label mb-1">Investments</label>
-                  <input id="ps-nbInvest" type="number" step="0.01" class="form-control" value="1200000">
-                </div>
-                <div class="col-6">
-                  <label class="form-label mb-1">Other Assets</label>
-                  <input id="ps-nbOther" type="number" step="0.01" class="form-control" value="200000">
-                </div>
-                <div class="col-6">
-                  <label class="form-label mb-1">Short-term Liabilities</label>
-                  <input id="ps-nbStLiab" type="number" step="0.01" class="form-control" value="150000">
-                </div>
-                <div class="col-6">
-                  <label class="form-label mb-1">Long-term Liabilities</label>
-                  <input id="ps-nbLtLiab" type="number" step="0.01" class="form-control" value="1800000">
-                </div>
+                <div class="col-6"><label class="form-label mb-1">Liquid Assets</label><input id="ps-nbLiquid" type="number" step="0.01" class="form-control" value="600000"></div>
+                <div class="col-6"><label class="form-label mb-1">Investments</label><input id="ps-nbInvest" type="number" step="0.01" class="form-control" value="1200000"></div>
+                <div class="col-6"><label class="form-label mb-1">Other Assets</label><input id="ps-nbOther" type="number" step="0.01" class="form-control" value="200000"></div>
+                <div class="col-6"><label class="form-label mb-1">Short-term Liabilities</label><input id="ps-nbStLiab" type="number" step="0.01" class="form-control" value="150000"></div>
+                <div class="col-6"><label class="form-label mb-1">Long-term Liabilities</label><input id="ps-nbLtLiab" type="number" step="0.01" class="form-control" value="1800000"></div>
               </div>
               <div class="mt-2 d-flex gap-2 align-items-center">
                 <button id="ps-nbCalc" class="btn btn-primary">Compute Net</button>
@@ -313,11 +315,7 @@ async function decryptKeyB64(encryptedB64, passphrase) {
 
           <div class="table-responsive" style="max-height:340px; overflow:auto">
             <table class="table table-sm" id="ps-summary-table">
-              <thead class="table-light">
-                <tr>
-                  <th>Section</th><th>Field</th><th>Value</th>
-                </tr>
-              </thead>
+              <thead class="table-light"><tr><th>Section</th><th>Field</th><th>Value</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -328,7 +326,6 @@ async function decryptKeyB64(encryptedB64, passphrase) {
           </div>
 
           <hr class="my-3"/>
-
           <div id="ps-health" class="small">
             <b>Financial health:</b> <span id="ps-health-pill" class="pill">—</span>
             <div id="ps-health-text" class="mt-2"></div>
@@ -336,14 +333,11 @@ async function decryptKeyB64(encryptedB64, passphrase) {
         </div>
       </div>
       <!-- ======= /Personal Finance Summary ======= -->
-
     </div>
 
     <!-- ================= Ladder ================= -->
     <div class="tab-pane fade" id="pane-lp" role="tabpanel" aria-labelledby="tab-lp">
-      <div class="card card-soft mb-3">
-        <div class="card-body"><b>Status:</b> <span id="lp-status" class="text-secondary small">🔄 Initializing…</span></div>
-      </div>
+      <div class="card card-soft mb-3"><div class="card-body"><b>Status:</b> <span id="lp-status" class="text-secondary small">🔄 Initializing…</span></div></div>
 
       <div class="row g-3">
         <div class="col-xl-7">
@@ -351,67 +345,28 @@ async function decryptKeyB64(encryptedB64, passphrase) {
             <div class="card-body">
               <h5 class="section-title mb-3">🎯 Goal & Assumptions</h5>
               <div class="row g-2">
-                <div class="col-md-4">
-                  <label class="form-label mb-1">Goal Amount (₹)</label>
-                  <input id="lp-goalAmt" type="number" step="0.01" class="form-control" value="2000000">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label mb-1">Goal Date (YYYY-MM)</label>
-                  <input id="lp-goalDate" type="month" class="form-control">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label mb-1">Start Date</label>
-                  <input id="lp-startDate" type="date" class="form-control">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label mb-1">Current Corpus (₹)</label>
-                  <input id="lp-currentCorpus" type="number" step="0.01" class="form-control" value="250000">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label mb-1">Corpus Annual Return %</label>
-                  <input id="lp-corpusRate" type="number" step="0.01" class="form-control" value="6">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label mb-1">Plan Split (SIP % / RD %)</label>
-                  <div class="input-group">
-                    <input id="lp-splitSip" type="number" class="form-control" value="60" min="0" max="100">
-                    <span class="input-group-text">/</span>
-                    <input id="lp-splitRd" type="number" class="form-control" value="40" min="0" max="100">
-                  </div>
+                <div class="col-md-4"><label class="form-label mb-1">Goal Amount (₹)</label><input id="lp-goalAmt" type="number" step="0.01" class="form-control" value="2000000"></div>
+                <div class="col-md-4"><label class="form-label mb-1">Goal Date (YYYY-MM)</label><input id="lp-goalDate" type="month" class="form-control"></div>
+                <div class="col-md-4"><label class="form-label mb-1">Start Date</label><input id="lp-startDate" type="date" class="form-control"></div>
+                <div class="col-md-4"><label class="form-label mb-1">Current Corpus (₹)</label><input id="lp-currentCorpus" type="number" step="0.01" class="form-control" value="250000"></div>
+                <div class="col-md-4"><label class="form-label mb-1">Corpus Annual Return %</label><input id="lp-corpusRate" type="number" step="0.01" class="form-control" value="6"></div>
+                <div class="col-md-4"><label class="form-label mb-1">Plan Split (SIP % / RD %)</label>
+                  <div class="input-group"><input id="lp-splitSip" type="number" class="form-control" value="60" min="0" max="100"><span class="input-group-text">/</span><input id="lp-splitRd" type="number" class="form-control" value="40" min="0" max="100"></div>
                   <div class="small-muted">Should sum to 100.</div>
                 </div>
-                <div class="col-md-4">
-                  <label class="form-label mb-1">SIP Expected Annual %</label>
-                  <input id="lp-sipRate" type="number" step="0.01" class="form-control" value="12">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label mb-1">RD/FD Annual %</label>
-                  <input id="lp-rdRate" type="number" step="0.01" class="form-control" value="7">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label mb-1">RD Interest</label>
-                  <select id="lp-rdMode" class="form-select">
-                    <option value="reinvest" selected>Reinvest (RD-style)</option>
-                    <option value="payout">Monthly payout (no compounding)</option>
-                  </select>
+                <div class="col-md-4"><label class="form-label mb-1">SIP Expected Annual %</label><input id="lp-sipRate" type="number" step="0.01" class="form-control" value="12"></div>
+                <div class="col-md-4"><label class="form-label mb-1">RD/FD Annual %</label><input id="lp-rdRate" type="number" step="0.01" class="form-control" value="7"></div>
+                <div class="col-md-4"><label class="form-label mb-1">RD Interest</label>
+                  <select id="lp-rdMode" class="form-select"><option value="reinvest" selected>Reinvest (RD-style)</option><option value="payout">Monthly payout (no compounding)</option></select>
                 </div>
               </div>
               <hr/>
               <div class="row g-2 align-items-end">
-                <div class="col-md-4">
-                  <label class="form-label mb-1">Solve</label>
-                  <select id="lp-solveMode" class="form-select">
-                    <option value="pmt" selected>Find required monthly contribution</option>
-                    <option value="fv">Project future value from my monthly amount</option>
-                  </select>
+                <div class="col-md-4"><label class="form-label mb-1">Solve</label>
+                  <select id="lp-solveMode" class="form-select"><option value="pmt" selected>Find required monthly contribution</option><option value="fv">Project future value from my monthly amount</option></select>
                 </div>
-                <div class="col-md-4">
-                  <label class="form-label mb-1">Monthly Contribution (₹)</label>
-                  <input id="lp-monthlyAmt" type="number" step="0.01" class="form-control" value="30000">
-                </div>
-                <div class="col-md-4">
-                  <button id="lp-runBtn" class="btn btn-primary w-100">Run Planner</button>
-                </div>
+                <div class="col-md-4"><label class="form-label mb-1">Monthly Contribution (₹)</label><input id="lp-monthlyAmt" type="number" step="0.01" class="form-control" value="30000"></div>
+                <div class="col-md-4"><button id="lp-runBtn" class="btn btn-primary w-100">Run Planner</button></div>
               </div>
             </div>
           </div>
@@ -433,12 +388,7 @@ async function decryptKeyB64(encryptedB64, passphrase) {
           <h6 class="mb-2">📅 Ladder Schedule</h6>
           <div class="table-responsive" style="max-height:320px; overflow:auto">
             <table class="table table-sm" id="lp-schedTable">
-              <thead class="table-light">
-                <tr>
-                  <th>#</th><th>Month</th><th>SIP Contrib</th><th>RD Contrib</th>
-                  <th>SIP Balance</th><th>RD Balance</th><th>Total Balance</th>
-                </tr>
-              </thead>
+              <thead class="table-light"><tr><th>#</th><th>Month</th><th>SIP Contrib</th><th>RD Contrib</th><th>SIP Balance</th><th>RD Balance</th><th>Total Balance</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -452,9 +402,7 @@ async function decryptKeyB64(encryptedB64, passphrase) {
 
     <!-- ================= FD ================= -->
     <div class="tab-pane fade" id="pane-fd" role="tabpanel" aria-labelledby="tab-fd">
-      <div class="card card-soft mb-3">
-        <div class="card-body"><b>Status:</b> <span id="fd-status" class="text-secondary small">🔄 Initializing…</span></div>
-      </div>
+      <div class="card card-soft mb-3"><div class="card-body"><b>Status:</b> <span id="fd-status" class="text-secondary small">🔄 Initializing…</span></div></div>
 
       <div class="row g-3">
         <div class="col-xl-7">
@@ -462,43 +410,21 @@ async function decryptKeyB64(encryptedB64, passphrase) {
             <div class="card-body">
               <h5 class="section-title mb-3">🔁 Auto-Staggered FD Ladder</h5>
               <div class="row g-2">
-                <div class="col-md-4">
-                  <label class="form-label mb-1">Total Principal (₹)</label>
-                  <input id="fd-total" type="number" class="form-control" value="600000">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label mb-1">Start Date</label>
-                  <input id="fd-start" type="date" class="form-control">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label mb-1">Horizon (months)</label>
-                  <input id="fd-horizon" type="number" class="form-control" value="36">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label mb-1">Annual Rate %</label>
-                  <input id="fd-rate" type="number" step="0.01" class="form-control" value="7">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label mb-1">Terms (months)</label>
+                <div class="col-md-4"><label class="form-label mb-1">Total Principal (₹)</label><input id="fd-total" type="number" class="form-control" value="600000"></div>
+                <div class="col-md-4"><label class="form-label mb-1">Start Date</label><input id="fd-start" type="date" class="form-control"></div>
+                <div class="col-md-4"><label class="form-label mb-1">Horizon (months)</label><input id="fd-horizon" type="number" class="form-control" value="36"></div>
+                <div class="col-md-4"><label class="form-label mb-1">Annual Rate %</label><input id="fd-rate" type="number" step="0.01" class="form-control" value="7"></div>
+                <div class="col-md-4"><label class="form-label mb-1">Terms (months)</label>
                   <select id="fd-terms" class="form-select" multiple>
-                    <option value="3" selected>3</option>
-                    <option value="6" selected>6</option>
-                    <option value="9" selected>9</option>
-                    <option value="12" selected>12</option>
+                    <option value="3" selected>3</option><option value="6" selected>6</option><option value="9" selected>9</option><option value="12" selected>12</option>
                   </select>
                   <div class="form-text small-muted">Ctrl/⌘-click to choose terms</div>
                 </div>
-                <div class="col-md-4">
-                  <label class="form-label mb-1">Mode</label>
-                  <select id="fd-mode" class="form-select">
-                    <option value="reinvest" selected>Reinvest on maturity</option>
-                    <option value="payout">Monthly interest payout</option>
-                  </select>
+                <div class="col-md-4"><label class="form-label mb-1">Mode</label>
+                  <select id="fd-mode" class="form-select"><option value="reinvest" selected>Reinvest on maturity</option><option value="payout">Monthly interest payout</option></select>
                 </div>
               </div>
-              <div class="mt-2 d-flex gap-2">
-                <button id="fd-run" class="btn btn-primary">Build Ladder</button>
-              </div>
+              <div class="mt-2 d-flex gap-2"><button id="fd-run" class="btn btn-primary">Build Ladder</button></div>
             </div>
           </div>
         </div>
@@ -519,11 +445,7 @@ async function decryptKeyB64(encryptedB64, passphrase) {
           <h6 class="mb-2">📅 Monthly Simulation</h6>
           <div class="table-responsive" style="max-height:320px; overflow:auto">
             <table class="table table-sm" id="fd-table">
-              <thead class="table-light">
-                <tr>
-                  <th>#</th><th>Month</th><th>Total Book Value</th><th>Interest Payout</th><th>Maturities</th>
-                </tr>
-              </thead>
+              <thead class="table-light"><tr><th>#</th><th>Month</th><th>Total Book Value</th><th>Interest Payout</th><th>Maturities</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -537,39 +459,35 @@ async function decryptKeyB64(encryptedB64, passphrase) {
   </div>
 </div>
 
-<!-- Floating Ask-AI Panel -->
+<!-- Floating Ask-AI Panel (ChatGPT-style) -->
 <div id="aiPanel" class="ai-panel">
   <div class="ai-head">
-    <span class="ai-dot"></span>
-    <div class="ai-title">Chat about this data — <span id="ai-scope">Personal Finance Studio</span></div>
-    <button id="aiCollapse" class="btn btn-sm btn-outline ms-auto">Minimize</button>
+    <div class="ai-title">🤖 Financial Assistant — <span id="ai-scope">Personal Finance Studio</span></div>
+    <button id="aiCollapse" class="btn btn-sm btn-outline ms-auto" aria-expanded="true" aria-controls="aiPanel">Minimize</button>
   </div>
+
   <div class="ai-body">
-    <div class="small-muted mb-2">
-      Secure mode: your OpenAI key is stored in encrypted form and decrypted on-device only when you run the agent.
+    <div id="ai-chat" class="ai-chat">
+      <!-- messages will render here -->
     </div>
 
-    <div class="row g-2">
-      <div class="col-7">
-        <label class="form-label">Model</label>
-        <select id="ai-model" class="form-select">
-          <option value="gpt-4o-mini" selected>gpt-4o-mini (fast, cheap)</option>
-          <option value="gpt-4o">gpt-4o</option>
-        </select>
-      </div>
-      <div class="col-5 d-flex align-items-end">
-        <button id="ai-insert" class="btn btn-outline w-100">Insert latest context</button>
+    <div class="ai-row">
+      <textarea id="ai-input" class="form-control" placeholder="Ask something about the active tab’s data…"></textarea>
+    </div>
+
+    <div class="tight">
+      <button id="ai-insert" class="btn btn-outline btn-sm">Insert latest context</button>
+      <div class="ms-auto d-flex gap-2">
+        <button id="ai-reset" class="btn btn-outline btn-sm">Reset</button>
+        <button id="ai-stop" class="btn btn-outline btn-sm">Stop</button>
+        <button id="ai-send" class="btn btn-primary btn-sm">Send</button>
       </div>
     </div>
-    <textarea id="ai-prompt" class="form-control mt-2" rows="4" placeholder="Ask something about the active tab’s data…"></textarea>
-    <div id="ai-status" class="small text-muted mt-2"></div>
-    <pre id="ai-out" class="mono mt-2 small mb-0">—</pre>
-  </div>
-  <div class="ai-foot">
-    <button id="ai-run" class="btn btn-primary w-100">Financial Assistant</button>
+
+    <div id="ai-status" class="small text-muted"></div>
   </div>
 </div>
-<button id="aiMini" class="ai-mini">🤖 Financial Assistant</button>
+<button id="aiMini" class="ai-mini" aria-expanded="false" aria-controls="aiPanel">🤖 Financial Assistant</button>
 
 <footer class="py-3 mt-4 border-top bg-white">
   <div class="container d-flex justify-content-between small">
@@ -599,7 +517,7 @@ function setSignal(el,val){
   el.className = 'pill ' + (n>0 ? 'pill-ok' : n===0 ? 'pill-warn' : 'pill-bad');
 }
 
-/* ======= Personal Finance Studio summary state & helpers ======= */
+/* ======= Personal Finance Studio state & helpers ======= */
 const psState = {
   inputs: {
     tvm: {solve:'fv', unit:'months', rate:2.5, n:5, pv:100000, pmt:0, fv:0},
@@ -676,17 +594,10 @@ function psSyncInputsFromDOM(){
   };
 }
 
-function prettyTVMKey(k){
-  if(k==='fv') return 'Future Value';
-  if(k==='pv') return 'Present Value';
-  if(k==='pmt') return 'Payment';
-  if(k==='n') return 'N (periods)';
-  return k.toUpperCase();
-}
+function prettyTVMKey(k){ if(k==='fv') return 'Future Value'; if(k==='pv') return 'Present Value'; if(k==='pmt') return 'Payment'; if(k==='n') return 'N (periods)'; return k.toUpperCase(); }
 
 function renderPSSummary() {
-  const tb = document.querySelector('#ps-summary-table tbody');
-  if(!tb) return;
+  const tb = document.querySelector('#ps-summary-table tbody'); if(!tb) return;
   tb.innerHTML = '';
 
   // TVM
@@ -742,10 +653,7 @@ function psExportCSV(){
   const rows = psSummaryRows();
   const csv = rows.map(r=>r.map(v=>String(v).includes(',')?`"${v}"`:v).join(',')).join('\n');
   const blob=new Blob([csv],{type:'text/csv'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='personal_finance_summary.csv';
-  a.click();
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='personal_finance_summary.csv'; a.click();
 }
 function psExportXLSX(){
   const wb=XLSX.utils.book_new();
@@ -754,7 +662,7 @@ function psExportXLSX(){
   XLSX.writeFile(wb,'personal_finance_summary.xlsx');
 }
 
-/* ================= Pyodide ================= */
+/* ================= Pyodide (compute core) ================= */
 async function initPy(){
   const ps=document.getElementById('ps-status'), lp=document.getElementById('lp-status'), fd=document.getElementById('fd-status');
   try{
@@ -805,7 +713,7 @@ def tvm_path_chart(rate,n,pv,pmt,unit_label='period'):
     ax.plot(range(len(vals)), vals, marker='o')
     ax.set_title('TVM Projection'); ax.set_xlabel(unit_label.capitalize()); ax.set_ylabel('Value')
     ax.grid(True,alpha=.3)
-    return {'values': list(vals), 'chart': b64(fig)}  # ensure plain list
+    return {'values': list(vals), 'chart': b64(fig)}
 
 def property_valuation(price,app,years,monthly_rent,occ,exp,cap,disc_rate=None):
     n=int(years)
@@ -932,8 +840,7 @@ def fd_ladder_sim(total,start_iso,horizon_months=36,terms=(3,6,9,12),rate_annual
     df=pd.DataFrame(rows)
     fig,ax=plt.subplots(figsize=(8,4.6))
     ax.plot(df['t'],df['book_value'],label='Book Value')
-    if mode=='payout':
-        ax.plot(df['t'],df['interest_payout'],label='Monthly Interest Payout')
+    if mode=='payout': ax.plot(df['t'],df['interest_payout'],label='Monthly Interest Payout')
     ax.grid(True,alpha=.3); ax.legend(); ax.set_xlabel('Month'); ax.set_ylabel('₹')
     chart=b64(fig)
     avg_payout = df['interest_payout'].mean() if 'interest_payout' in df.columns else 0.0
@@ -948,7 +855,7 @@ def fd_ladder_sim(total,start_iso,horizon_months=36,terms=(3,6,9,12),rate_annual
   }
 }
 
-/* ================= Personal Finance Studio handlers ================= */
+/* ================= Personal Finance handlers ================= */
 function psBuildContext(){
   try{
     const ctx=pyodide.runPython(`build_context(globals().get('last_tvm'),globals().get('last_prop'),globals().get('last_cf'),globals().get('last_nb'))`);
@@ -959,31 +866,27 @@ function pySet(name,obj){ try{pyodide.globals.set(name,obj)}catch(_){} }
 
 function psHandleTVM(){
   const solve=document.getElementById('ps-tvmSolve').value;
-  const unit=document.getElementById('ps-tvmUnit').value; // 'months' | 'years'
-  const rate=Number(document.getElementById('ps-tvmRate').value);  // % per period
+  const unit=document.getElementById('ps-tvmUnit').value;
+  const rate=Number(document.getElementById('ps-tvmRate').value);
   const nRaw=Number(document.getElementById('ps-tvmN').value),
         pvRaw=Number(document.getElementById('ps-tvmPV').value);
   const pmtRaw=Number(document.getElementById('ps-tvmPMT').value),
         fvRaw=Number(document.getElementById('ps-tvmFV').value);
 
   psState.inputs.tvm = {solve, unit, rate, n:nRaw, pv:pvRaw, pmt:pmtRaw, fv:fvRaw};
-
   const r=rate/100;
   const res=pyodide.runPython(`tvm(${r},${nRaw},${pvRaw},${pmtRaw},${fvRaw},solve='${solve}')`).toJs({dict_hook:Object});
-  psState.outputs.tvm = res;
-  pySet('last_tvm',res);
+  psState.outputs.tvm = res; pySet('last_tvm',res);
 
   const k=Object.keys(res)[0];
   const pretty = prettyTVMKey(k);
   const valueTxt = k==='n' ? String(res[k]) : `₹${fmtINR(res[k])}`;
   document.getElementById('ps-tvmOut').textContent=`${pretty}: ${valueTxt}`;
 
-  // Effective params for path + facts (use current inputs; not the solve target)
   const nEff = Math.max(0, Math.round(solve==='n' ? Number(res.n||nRaw) : nRaw));
   const pvEff = solve==='pv' ? Number(res.pv||pvRaw) : pvRaw;
   const pmtEff = solve==='pmt' ? Number(res.pmt||pmtRaw) : pmtRaw;
 
-  // Build path + chart (axis label uses unit)
   try{
     const path=pyodide.runPython(`tvm_path_chart(${r},${nEff},${pvEff},${pmtEff},unit_label='${unit}')`).toJs({dict_hook:Object});
     psState.outputs.tvm_path = Array.isArray(path.values) ? path.values : [];
@@ -993,7 +896,6 @@ function psHandleTVM(){
     document.getElementById('ps-tvmFacts').textContent='(Projection unavailable for current inputs)';
   }
 
-  // Exact final
   const finalVal = r===0 ? (pvEff + pmtEff*nEff) : (pvEff*Math.pow(1+r,nEff) + pmtEff*((Math.pow(1+r,nEff)-1)/r));
   const totalContrib = pvEff + (pmtEff*nEff);
   const growth = finalVal - totalContrib;
@@ -1014,10 +916,8 @@ function psHandleProperty(){
         cap=Number(document.getElementById('ps-propCap').value);
 
   psState.inputs.property = {price, app, years:yrs, rent, occ, exp, cap};
-
   const res=pyodide.runPython(`property_valuation(${price},${app/100},${yrs},${rent==null?'None':rent},${occ},${exp},${cap})`).toJs({dict_hook:Object});
-  psState.outputs.property = res;
-  pySet('last_prop',res);
+  psState.outputs.property = res; pySet('last_prop',res);
 
   document.getElementById('ps-propOut').textContent=`NOI ₹${fmtINR(res.noi_now)} | CapVal ₹${fmtINR(res.cap_value_today)} | DCF ₹${fmtINR(res.dcf_value)}`;
   document.getElementById('ps-propChart').src='data:image/png;base64,'+res.chart;
@@ -1035,10 +935,8 @@ function psHandleCF(){
     invest:Number(document.getElementById('ps-cfInv').value)
   };
   psState.inputs.cashflow = {...cf};
-
   const res=pyodide.runPython(`monthly_cash_flow(${cf.income},${cf.biz},${cf.fixed},${cf.variable},${cf.emi},${cf.invest})`).toJs({dict_hook:Object});
-  psState.outputs.cashflow = res;
-  pySet('last_cf',res);
+  psState.outputs.cashflow = res; pySet('last_cf',res);
 
   document.getElementById('ps-cfOut').textContent=`Net / month: ₹${fmtINR(res.net)} (Inflow ₹${fmtINR(res.inflow)}, Outflow ₹${fmtINR(res.outflow)})`;
   document.getElementById('ps-cfChart').src='data:image/png;base64,'+res.chart;
@@ -1055,10 +953,8 @@ function psHandleNB(){
     lt:Number(document.getElementById('ps-nbLtLiab').value)
   };
   psState.inputs.net = {...nb};
-
   const res=pyodide.runPython(`net_balance(${nb.liquid},${nb.invest},${nb.other},${nb.st},${nb.lt})`).toJs({dict_hook:Object});
-  psState.outputs.net = res;
-  pySet('last_nb',res);
+  psState.outputs.net = res; pySet('last_nb',res);
 
   document.getElementById('ps-nbOut').textContent=`Assets ₹${fmtINR(res.assets)} | Liabs ₹${fmtINR(res.liabs)} | Net ₹${fmtINR(res.net)}`;
   document.getElementById('ps-nbChart').src='data:image/png;base64,'+res.chart;
@@ -1101,16 +997,13 @@ function lpRun(){
     lines.push(`Gap to goal: ₹${fmtINR(r.gap_to_goal)}`);
     document.getElementById('lp-results').textContent=lines.join('\n');
     document.getElementById('lp-chart').src='data:image/png;base64,'+out[2];
-    const tb=document.querySelector('#lp-schedTable tbody');
-    tb.innerHTML='';
+    const tb=document.querySelector('#lp-schedTable tbody'); tb.innerHTML='';
     lpDF.forEach((row,i)=>{
       const tr=document.createElement('tr');
       tr.innerHTML=`<td>${i+1}</td><td>${row.month}</td><td>₹${fmtINR(row.sip_contrib)}</td><td>₹${fmtINR(row.rd_contrib)}</td><td>₹${fmtINR(row.sip_balance)}</td><td>₹${fmtINR(row.rd_balance)}</td><td>₹${fmtINR(row.total_balance)}</td>`;
       tb.appendChild(tr);
     });
-  }catch(e){
-    document.getElementById('lp-results').textContent='Error: '+(e?.message||e);
-  }
+  }catch(e){ document.getElementById('lp-results').textContent='Error: '+(e?.message||e); }
 }
 
 /* ================= FD handlers ================= */
@@ -1138,16 +1031,13 @@ function fdRun(){
     lines.push(`Maturities (count over horizon): ${s.total_maturities}`);
     document.getElementById('fd-results').textContent=lines.join('\n');
     document.getElementById('fd-chart').src='data:image/png;base64,'+out[2];
-    const tb=document.querySelector('#fd-table tbody');
-    tb.innerHTML='';
+    const tb=document.querySelector('#fd-table tbody'); tb.innerHTML='';
     fdSim.forEach((row,i)=>{
       const tr=document.createElement('tr');
       tr.innerHTML=`<td>${i+1}</td><td>${row.month}</td><td>₹${fmtINR(row.book_value)}</td><td>${p.mode==='payout'?'₹'+fmtINR(row.interest_payout):'-'}</td><td>${row.maturities}</td>`;
       tb.appendChild(tr);
     });
-  }catch(e){
-    document.getElementById('fd-results').textContent='Error: '+(e?.message||e);
-  }
+  }catch(e){ document.getElementById('fd-results').textContent='Error: '+(e?.message||e); }
 }
 
 /* ================= Exports (LP + FD) ================= */
@@ -1175,10 +1065,7 @@ function lpExportCSV(){
   const parts=['Index,Month,SIP Contrib,RD Contrib,SIP Balance,RD Balance,Total Balance'];
   lpDF.forEach((r,i)=>parts.push([i+1,r.month,r.sip_contrib,r.rd_contrib,r.sip_balance,r.rd_balance,r.total_balance].join(',')));
   const blob=new Blob([parts.join('\n')],{type:'text/csv'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='ladder_planner.csv';
-  a.click();
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ladder_planner.csv'; a.click();
 }
 function fdExportExcel(){
   if(!fdSim){alert('Build the ladder first.');return;}
@@ -1204,13 +1091,10 @@ function fdExportCSV(){
   const parts=['Index,Month,Book Value,Interest Payout, Maturities'];
   fdSim.forEach((r,i)=>parts.push([i+1,r.month,r.book_value,r.interest_payout||0,r.maturities].join(',')));
   const blob=new Blob([parts.join('\n')],{type:'text/csv'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='fd_ladder.csv';
-  a.click();
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='fd_ladder.csv'; a.click();
 }
 
-/* ================= OpenAI Panel ================= */
+/* ================= OpenAI Chat (threaded) ================= */
 function contextPS(){
   const ctx=psBuildContext();
   return ctx || 'No Personal Finance Studio calculations yet.';
@@ -1225,28 +1109,6 @@ function contextFD(){
   const s=fdSummary;
   return `FD Ladder Summary: rungs=${s.rungs}, terms=${(s.terms||[]).join('/')}, per_rung=${s.per_rung}, mode=${s.mode}, rate=${s.rate_annual}, final_book=${s.final_book_value}, avg_payout=${s.avg_payout_per_month}, maturities=${s.total_maturities}`;
 }
-
-async function callOpenAI({key,model,prompt}){
-  const resp=await fetch('https://api.openai.com/v1/chat/completions',{
-    method:'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + String(key)
-    },
-    body:JSON.stringify({
-      model: model,
-      temperature:0.3,
-      messages:[
-        {role:'system',content:'You are a helpful financial planning assistant. Keep answers concise and actionable.'},
-        {role:'user',content:prompt}
-      ]
-    })
-  });
-  if(!resp.ok) throw new Error('OpenAI error ' + resp.status);
-  const data=await resp.json();
-  return (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content ? data.choices[0].message.content : '').trim();
-}
-
 function currentContext(){
   if(activeTab==='ps') return contextPS();
   if(activeTab==='lp') return contextLP();
@@ -1255,6 +1117,47 @@ function currentContext(){
 function updateScopeLabel(){
   document.getElementById('ai-scope').textContent =
     activeTab==='ps' ? 'Personal Finance Studio' : activeTab==='lp' ? 'SIP/RD Planner' : 'FD Ladder';
+}
+
+let aiMessages = [
+  {role:'system', content:'You are a helpful financial planning assistant. Keep answers concise and actionable.'}
+];
+let aiAbort = null;
+
+function renderChat(){
+  const chat = document.getElementById('ai-chat');
+  chat.innerHTML = '';
+  aiMessages.forEach(m=>{
+    if(m.role==='system'){
+      const div=document.createElement('div'); div.className='sys'; div.textContent='— New session started —';
+      chat.appendChild(div);
+      return;
+    }
+    const div=document.createElement('div');
+    div.className = 'msg ' + (m.role==='user'?'me':'ai');
+    div.textContent = m.content;
+    chat.appendChild(div);
+  });
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function callOpenAIThread(messages, signal){
+  const key = await decryptKeyB64(OPENAI_KEY_ENCRYPTED, PASSPHRASE);
+  if(!key) throw new Error('OpenAI key is not configured. Paste your encrypted key in OPENAI_KEY_ENCRYPTED and ensure PASSPHRASE matches.');
+  const resp = await fetch('https://api.openai.com/v1/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+    body:JSON.stringify({
+      model:'gpt-4.1',
+      temperature:0.3,
+      messages:messages
+    }),
+    signal
+  });
+  if(!resp.ok) throw new Error('OpenAI error ' + resp.status);
+  const data = await resp.json();
+  const text = (data?.choices?.[0]?.message?.content || '').trim();
+  return text.replace(/\$/g,'₹');
 }
 
 /* ================= Wire UI ================= */
@@ -1283,15 +1186,13 @@ window.addEventListener('DOMContentLoaded', ()=>{
       psSyncInputsFromDOM();
       if(el.id==='ps-tvmUnit'){ psState.inputs.tvm.unit = document.getElementById('ps-tvmUnit').value; }
       if(el.id==='ps-tvmSolve'){ psState.inputs.tvm.solve = document.getElementById('ps-tvmSolve').value; }
-      renderHealth();
-      renderPSSummary();
+      renderHealth(); renderPSSummary();
     });
     el.addEventListener('change', ()=>{
       psSyncInputsFromDOM();
       if(el.id==='ps-tvmUnit'){ psState.inputs.tvm.unit = document.getElementById('ps-tvmUnit').value; }
       if(el.id==='ps-tvmSolve'){ psState.inputs.tvm.solve = document.getElementById('ps-tvmSolve').value; }
-      renderHealth();
-      renderPSSummary();
+      renderHealth(); renderPSSummary();
     });
   });
 
@@ -1320,55 +1221,87 @@ window.addEventListener('DOMContentLoaded', ()=>{
   });
 
   // Floating AI
-  const aiModel=document.getElementById('ai-model');
-  const aiInsert=document.getElementById('ai-insert');
-  const aiRun=document.getElementById('ai-run');
-  const aiStatus=document.getElementById('ai-status');
-  const aiOut=document.getElementById('ai-out');
-  const aiPrompt=document.getElementById('ai-prompt');
   const aiPanel=document.getElementById('aiPanel');
   const aiMini=document.getElementById('aiMini');
+  const aiStatus=document.getElementById('ai-status');
+  const aiInput=document.getElementById('ai-input');
+  const aiInsert=document.getElementById('ai-insert');
+  const aiSend=document.getElementById('ai-send');
+  const aiStop=document.getElementById('ai-stop');
+  const aiReset=document.getElementById('ai-reset');
+  const aiCollapse=document.getElementById('aiCollapse');
 
   updateScopeLabel();
+  renderChat();
 
+  // Insert context
   aiInsert.addEventListener('click', ()=>{
     const ctx=currentContext();
-    const base=aiPrompt.value.trim();
-    aiPrompt.value=(base?base+'\n\n':'')+`Context:\n${ctx}\n\nInstruction:`;
+    const base=aiInput.value.trim();
+    aiInput.value=(base?base+'\n\n':'')+`Context:\n${ctx}\n\nInstruction:`;
+    aiInput.focus();
   });
 
-  aiRun.addEventListener('click', async ()=>{
+  // Send
+  aiSend.addEventListener('click', async ()=>{
+    const text = aiInput.value.trim() || ('Summarize and give 3 actions:\n' + currentContext());
+    if(!text) return;
+    aiInput.value='';
+    aiMessages.push({role:'user', content:text});
+    renderChat();
+    aiStatus.innerHTML='<span class="spinner"></span> Thinking…';
+
     try{
-      aiStatus.innerHTML='<span class="spinner"></span> Thinking…';
-      aiOut.textContent='—';
-
-      // Decrypt the key just-in-time
-      const key = await decryptKeyB64(OPENAI_KEY_ENCRYPTED, PASSPHRASE);
-      if(!key){
-        aiStatus.textContent='OpenAI key is not configured. Paste your encrypted key in OPENAI_KEY_ENCRYPTED and ensure PASSPHRASE matches.';
-        return;
-      }
-
-      const model=aiModel.value;
-      const userPrompt = aiPrompt.value.trim() || ('Summarize and give 3 actions:\n' + currentContext());
-
-      const text=await callOpenAI({key,model,prompt:userPrompt});
-      const normalized = text ? text.replace(/\$/g, '₹') : '';
-      aiOut.textContent=normalized || '(No content)';
+      aiAbort = new AbortController();
+      const reply = await callOpenAIThread(aiMessages, aiAbort.signal);
+      aiMessages.push({role:'assistant', content:reply || '(No content)'});
+      renderChat();
       aiStatus.textContent='Done.';
     }catch(err){
-      aiStatus.textContent=String(err.message||err);
-      console.error(err);
+      aiStatus.textContent = (err.name==='AbortError') ? 'Stopped.' : String(err.message||err);
+    }finally{
+      aiAbort = null;
     }
   });
 
-  document.getElementById('aiCollapse').addEventListener('click', ()=>{
-    aiPanel.classList.add('ai-hide');
-    aiMini.style.display='inline-block';
+  // Stop
+  aiStop.addEventListener('click', ()=>{
+    if(aiAbort){ aiAbort.abort(); }
   });
+
+  // Reset
+  aiReset.addEventListener('click', ()=>{
+    aiMessages = [{role:'system', content:'You are a helpful financial planning assistant. Keep answers concise and actionable.'}];
+    renderChat();
+    aiStatus.textContent='Session reset.';
+  });
+
+  // Minimize panel (fix)
+  aiCollapse.addEventListener('click', ()=>{
+    aiPanel.classList.add('ai-hidden');
+    aiMini.style.display='inline-block';
+    aiCollapse.setAttribute('aria-expanded','false');
+    aiMini.setAttribute('aria-expanded','true');
+  });
+
+  // Restore panel
   aiMini.addEventListener('click', ()=>{
-    aiPanel.classList.remove('ai-hide');
+    aiPanel.classList.remove('ai-hidden');
     aiMini.style.display='none';
+    aiCollapse.setAttribute('aria-expanded','true');
+    aiMini.setAttribute('aria-expanded','false');
+    // ensure chat scrolls to newest
+    const chat = document.getElementById('ai-chat');
+    chat.scrollTop = chat.scrollHeight;
+    aiInput.focus();
+  });
+
+  // Enter to send with Shift+Enter for newline
+  aiInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' && !e.shiftKey){
+      e.preventDefault();
+      aiSend.click();
+    }
   });
 });
 </script>
